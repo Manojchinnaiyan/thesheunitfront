@@ -1,24 +1,38 @@
 {
   "name": "ecommerce-frontend",
+  "version": "1.0.0",
   "private": true,
+  "description": "TheShe Unit Frontend Monorepo",
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "dev:storefront": "turbo dev --filter=storefront",
+    "dev:admin": "turbo dev --filter=admin",
+    "build:storefront": "turbo build --filter=storefront",
+    "build:admin": "turbo build --filter=admin"
   },
   "devDependencies": {
-    "prettier": "^3.6.0",
-    "turbo": "^2.5.4",
-    "typescript": "5.8.2"
+    "@turbo/gen": "^1.10.12",
+    "eslint": "^8.48.0",
+    "prettier": "^3.0.0",
+    "turbo": "latest",
+    "typescript": "^5.2.2"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "packageManager": "npm@10.9.2",
+  "packageManager": "npm@10.2.4",
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "@hookform/resolvers": "^3.10.0",
+    "@tanstack/react-query": "^5.81.5",
+    "axios": "^1.10.0",
+    "react-hook-form": "^7.59.0",
+    "zod": "^3.25.67",
+    "zustand": "^4.5.7"
+  }
 }
