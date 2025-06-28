@@ -6,9 +6,11 @@ export { authService, AuthService } from './auth';
 export { productsService, ProductsService } from './products';
 export { cartService, CartService } from './cart';
 export { ordersService, OrdersService } from './orders';
+export { categoriesService, CategoriesService } from './categories';
 
 // Export service types
 export type { CreateOrderRequest } from './orders';
+export type { CategoriesResponse, CategoryResponse, CategoryTree } from './categories';
 
 // Re-export types from @repo/types for convenience
 export type {

@@ -257,3 +257,19 @@ export interface OrderCreateRequest {
   notes?: string;
   use_shipping_as_billing?: boolean;
 }
+
+// Category interface (ensuring it matches your backend response)
+export interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  image: string;
+  parent_id: number | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  parent?: Category;
+  children?: Category[];
+}
