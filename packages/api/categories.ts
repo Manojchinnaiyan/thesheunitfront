@@ -1,108 +1,86 @@
 import { apiClient } from './client';
 import { API_ENDPOINTS } from '@repo/config';
-import type { Category, ApiResponse } from '@repo/types';
 
-// API Response interfaces based on your backend
-export interface CategoriesResponse {
+// Response interfaces matching your exact backend response
+export interface CategoriesApiResponse {
   message: string;
-  data: Category[];
-}
-
-export interface CategoryResponse {
-  message: string;
-  data: Category;
-}
-
-export interface CategoryTreeResponse {
-  message: string;
-  data: CategoryTree[];
-}
-
-export interface CategoryTree extends Category {
-  children?: CategoryTree[];
+  data: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    description: string;
+    image: string;
+    parent_id: number | null;
+    sort_order: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  }>;
 }
 
 export class CategoriesService {
-  async getCategories(params?: { include_counts?: boolean }): Promise<CategoriesResponse> {
+  async getCategories(params?: { include_counts?: boolean }): Promise<CategoriesApiResponse> {
     try {
-      console.log('CategoriesService.getCategories called with params:', params);
+      console.log('🔄 CategoriesService.getCategories called');
+      console.log('📍 API Base URL:', 'http://localhost:8080/api/v1');
+      console.log('📍 Categories endpoint:', API_ENDPOINTS.CATEGORIES);
       
-      const queryParams = new URLSearchParams();
+      let url = API_ENDPOINTS.CATEGORIES;
       if (params?.include_counts) {
-        queryParams.append('include_counts', 'true');
+        url += '?include_counts=true';
       }
       
-      const url = queryParams.toString() 
-        ? `${API_ENDPOINTS.CATEGORIES}?${queryParams.toString()}`
-        : API_ENDPOINTS.CATEGORIES;
+      console.log('🌐 Making request to:', url);
       
-      console.log('Making API call to:', url);
-      const response = await apiClient.get<CategoriesResponse>(url);
+      const response = await apiClient.get<CategoriesApiResponse>(url);
+      console.log('✅ Categories API success:', response);
+      return response;
       
-      console.log('Categories API response:', response);
-      return response;
-    } catch (error) {
-      console.error('Error in CategoriesService.getCategories:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('❌ CategoriesService.getCategories error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
+      throw new Error(`Failed to fetch categories: ${error.message}`);
     }
   }
 
-  async getCategoryTree(): Promise<CategoryTreeResponse> {
+  async getRootCategories(): Promise<CategoriesApiResponse> {
     try {
-      console.log('CategoriesService.getCategoryTree called');
-      const response = await apiClient.get<CategoryTreeResponse>(`${API_ENDPOINTS.CATEGORIES}/tree`);
-      console.log('Category tree API response:', response);
+      console.log('🔄 CategoriesService.getRootCategories called');
+      const url = `${API_ENDPOINTS.CATEGORIES}/root`;
+      console.log('🌐 Making request to:', url);
+      
+      const response = await apiClient.get<CategoriesApiResponse>(url);
+      console.log('✅ Root categories API success:', response);
       return response;
-    } catch (error) {
-      console.error('Error in CategoriesService.getCategoryTree:', error);
-      throw error;
+      
+    } catch (error: any) {
+      console.error('❌ CategoriesService.getRootCategories error:', error);
+      throw new Error(`Failed to fetch root categories: ${error.message}`);
     }
   }
 
-  async getRootCategories(): Promise<CategoriesResponse> {
+  // Direct fetch method as fallback
+  async getCategoriesDirect(): Promise<CategoriesApiResponse> {
     try {
-      console.log('CategoriesService.getRootCategories called');
-      const response = await apiClient.get<CategoriesResponse>(`${API_ENDPOINTS.CATEGORIES}/root`);
-      console.log('Root categories API response:', response);
-      return response;
+      console.log('🔄 Direct fetch method called');
+      const response = await fetch('http://localhost:8080/api/v1/products/categories');
+      console.log('🌐 Direct fetch response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Direct fetch success:', data);
+      return data;
+      
     } catch (error) {
-      console.error('Error in CategoriesService.getRootCategories:', error);
-      throw error;
-    }
-  }
-
-  async getCategory(id: number): Promise<CategoryResponse> {
-    try {
-      console.log('CategoriesService.getCategory called with id:', id);
-      const response = await apiClient.get<CategoryResponse>(`${API_ENDPOINTS.CATEGORIES}/${id}`);
-      console.log('Category API response:', response);
-      return response;
-    } catch (error) {
-      console.error('Error in CategoriesService.getCategory:', error);
-      throw error;
-    }
-  }
-
-  async getCategoryBySlug(slug: string): Promise<CategoryResponse> {
-    try {
-      console.log('CategoriesService.getCategoryBySlug called with slug:', slug);
-      const response = await apiClient.get<CategoryResponse>(`${API_ENDPOINTS.CATEGORIES}/slug/${slug}`);
-      console.log('Category by slug API response:', response);
-      return response;
-    } catch (error) {
-      console.error('Error in CategoriesService.getCategoryBySlug:', error);
-      throw error;
-    }
-  }
-
-  async getSubcategories(id: number): Promise<CategoriesResponse> {
-    try {
-      console.log('CategoriesService.getSubcategories called with id:', id);
-      const response = await apiClient.get<CategoriesResponse>(`${API_ENDPOINTS.CATEGORIES}/${id}/subcategories`);
-      console.log('Subcategories API response:', response);
-      return response;
-    } catch (error) {
-      console.error('Error in CategoriesService.getSubcategories:', error);
+      console.error('❌ Direct fetch error:', error);
       throw error;
     }
   }

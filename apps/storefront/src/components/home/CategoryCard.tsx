@@ -1,10 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import type { Category } from '@repo/types';
 
 interface CategoryCardProps {
-  category: Category;
+  category: {
+    id: number;
+    name: string;
+    slug: string;
+    description: string;
+    image: string;
+  };
 }
 
 const categoryIcons: Record<string, string> = {
@@ -18,44 +23,55 @@ const categoryIcons: Record<string, string> = {
   'Food': '🍕',
   'Health': '🏥',
   'Automotive': '🚗',
-  'Fashion': '👗',
-  'Accessories': '👜',
-  'Shoes': '👟',
-  'Jewelry': '💍',
   'default': '🛍️'
+};
+
+const categoryColors: Record<string, string> = {
+  'Electronics': 'from-blue-400 to-blue-600',
+  'Clothing': 'from-pink-400 to-pink-600',
+  'Books': 'from-green-400 to-green-600',
+  'Home & Garden': 'from-yellow-400 to-yellow-600',
+  'Sports & Outdoors': 'from-red-400 to-red-600',
+  'Beauty': 'from-purple-400 to-purple-600',
+  'Toys': 'from-indigo-400 to-indigo-600',
+  'Food': 'from-orange-400 to-orange-600',
+  'Health': 'from-teal-400 to-teal-600',
+  'Automotive': 'from-gray-400 to-gray-600',
+  'default': 'from-blue-400 to-blue-600'
 };
 
 export function CategoryCard({ category }: CategoryCardProps) {
   const icon = categoryIcons[category.name] || categoryIcons.default;
+  const gradient = categoryColors[category.name] || categoryColors.default;
 
   return (
     <Link
       href={`/products?category_id=${category.id}`}
       className="group block"
     >
-      <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 p-6 text-center border-2 border-transparent hover:border-blue-200">
-        <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
-          {category.image ? (
-            <img 
-              src={category.image} 
-              alt={category.name}
-              className="w-12 h-12 mx-auto object-cover rounded-lg"
-            />
-          ) : (
-            icon
-          )}
+      <div className="relative overflow-hidden rounded-xl bg-white shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+        <div className={`h-20 bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <div className="text-3xl group-hover:scale-110 transition-transform duration-300">
+            {category.image ? (
+              <img 
+                src={category.image} 
+                alt={category.name}
+                className="w-8 h-8 object-cover"
+              />
+            ) : (
+              <span className="text-white filter drop-shadow-lg">{icon}</span>
+            )}
+          </div>
         </div>
-        <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-          {category.name}
-        </h3>
-        {category.description && (
-          <p className="text-sm text-gray-600 line-clamp-2">
-            {category.description}
-          </p>
-        )}
-        <div className="mt-4 text-sm text-blue-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-          Browse →
+        
+        <div className="p-3 text-center">
+          <h3 className="font-semibold text-gray-900 text-sm group-hover:text-blue-600 transition-colors">
+            {category.name}
+          </h3>
         </div>
+
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-xl"></div>
       </div>
     </Link>
   );

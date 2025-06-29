@@ -1,20 +1,47 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { categoriesService } from '@repo/api';
-import { CategoryCard } from '@/components/home/CategoryCard';
+import { useState, useEffect } from "react";
+import { CategoryCard } from "@/components/home/CategoryCard";
 
 export default function CategoriesPage() {
-  const { data: categoriesResponse, isLoading, error } = useQuery({
-    queryKey: ['all-categories'],
-    queryFn: () => categoriesService.getCategories({ include_counts: true }),
-    retry: 3,
-    retryDelay: 1000,
-  });
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  console.log('Categories page data:', { categoriesResponse, isLoading, error });
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        console.log("🔄 Fetching categories...");
+        setLoading(true);
+        setError(null);
 
-  if (isLoading) {
+        const response = await fetch(
+          "http://localhost:8080/api/v1/products/categories"
+        );
+        console.log("📡 Response status:", response.status);
+
+        if (!response.ok) {
+          throw new Error(
+            `API returned ${response.status}: ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+        console.log("📦 Categories data:", data);
+
+        setCategories(data.data || []);
+        setLoading(false);
+      } catch (err: any) {
+        console.error("💥 Error fetching categories:", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    }
+
+    fetchCategories();
+  }, []);
+
+  if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-8">
@@ -37,10 +64,25 @@ export default function CategoriesPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Categories</h1>
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-            Failed to load categories: {error.message}
-            <div className="mt-2 text-sm">
-              Please check your internet connection and try again.
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded max-w-md mx-auto">
+            <p>
+              <strong>Error:</strong> {error}
+            </p>
+            <div className="mt-4 text-sm text-left">
+              <p>
+                <strong>Troubleshooting:</strong>
+              </p>
+              <ul className="list-disc ml-4 mt-2">
+                <li>Check if backend is running on http://localhost:8080</li>
+                <li>Verify categories exist in database</li>
+                <li>Check browser console for CORS errors</li>
+                <li>
+                  Test API directly:{" "}
+                  <code className="bg-gray-100 px-1">
+                    curl http://localhost:8080/api/v1/products/categories
+                  </code>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
@@ -48,14 +90,15 @@ export default function CategoriesPage() {
     );
   }
 
-  const categories = categoriesResponse?.data || [];
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">All Categories</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          All Categories
+        </h1>
         <p className="text-lg text-gray-600">
-          Browse our complete collection of product categories
+          Browse our complete collection of product categories (
+          {categories.length} found)
         </p>
       </div>
 
@@ -68,8 +111,12 @@ export default function CategoriesPage() {
       ) : (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📂</div>
-          <h3 className="text-xl font-medium text-gray-900 mb-2">No categories found</h3>
-          <p className="text-gray-600">Categories will appear here once they are added.</p>
+          <h3 className="text-xl font-medium text-gray-900 mb-2">
+            No categories found
+          </h3>
+          <p className="text-gray-600">
+            Categories will appear here once they are added.
+          </p>
         </div>
       )}
     </div>

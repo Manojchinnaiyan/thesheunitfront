@@ -1,3 +1,9 @@
+# Step 1 Fix: Correct Backend Field Names
+# Navigate to storefront
+cd apps/storefront
+
+# Fix the AddressForm to match exact backend field names
+cat > src/components/checkout/AddressForm.tsx << 'EOF'
 'use client';
 
 import { useState } from 'react';
@@ -401,3 +407,28 @@ export function AddressForm({
     </div>
   );
 }
+EOF
+
+echo "✅ Step 1 FIXED: Corrected backend field names"
+echo ""
+echo "🔧 Critical fixes applied:"
+echo "   ✅ address_line1 (was address_line_1) - backend expects no underscore"
+echo "   ✅ address_line2 (was address_line_2) - backend expects no underscore"
+echo "   ✅ All other required fields properly named"
+echo "   ✅ 2-letter country codes (IN, US, GB, etc.)"
+echo "   ✅ Proper validation for all required fields"
+echo ""
+echo "📝 Test this now in your profile page - the validation error should be fixed!"
+echo ""
+echo "Backend expects these exact field names:"
+echo "   • type: 'shipping' or 'billing'"
+echo "   • first_name: string"
+echo "   • last_name: string"
+echo "   • address_line1: string (NO underscore!)"
+echo "   • address_line2: string (NO underscore!)"
+echo "   • city: string"
+echo "   • state: string"
+echo "   • postal_code: string"
+echo "   • country: 2-letter code (IN, US, etc.)"
+echo "   • phone: string (optional)"
+echo "   • is_default: boolean"

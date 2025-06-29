@@ -1,18 +1,40 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { productsService, categoriesService } from '@repo/api';
+import { productsService } from '@repo/api';
 import { ProductCard } from '@/components/products/ProductCard';
 import { HeroSection } from '@/components/home/HeroSection';
 import { CategoryCard } from '@/components/home/CategoryCard';
 import { FeaturedProducts } from '@/components/home/FeaturedProducts';
-import { PromoBanner } from '@/components/home/PromoBanner';
+import { DealsSection } from '@/components/home/DealsSection';
 import { Newsletter } from '@/components/home/Newsletter';
+import { TrustBadges } from '@/components/home/TrustBadges';
+import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 
 export default function HomePage() {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  // Fetch categories
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const response = await fetch('http://localhost:8080/api/v1/products/categories');
+        const data = await response.json();
+        setCategories(data.data || []);
+        setCategoriesLoading(false);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategoriesLoading(false);
+      }
+    }
+    fetchCategories();
+  }, []);
+
   // Fetch featured products
-  const { data: featuredProducts, isLoading: productsLoading, error: productsError } = useQuery({
+  const { data: featuredProducts, isLoading: productsLoading } = useQuery({
     queryKey: ['featured-products'],
     queryFn: () => productsService.getProducts({
       page: 1,
@@ -20,130 +42,101 @@ export default function HomePage() {
       is_featured: true,
       is_active: true
     }),
-    retry: 3,
-    retryDelay: 1000,
-  });
-
-  // Fetch root categories for homepage display  
-  const { data: categoriesResponse, isLoading: categoriesLoading, error: categoriesError } = useQuery({
-    queryKey: ['root-categories'],
-    queryFn: () => categoriesService.getRootCategories(),
-    retry: 3,
-    retryDelay: 1000,
   });
 
   // Fetch latest products
-  const { data: latestProducts, isLoading: latestLoading, error: latestError } = useQuery({
+  const { data: latestProducts, isLoading: latestLoading } = useQuery({
     queryKey: ['latest-products'],
     queryFn: () => productsService.getProducts({
       page: 1,
-      limit: 4,
+      limit: 6,
       sort_by: 'created_at',
       sort_order: 'desc',
       is_active: true
     }),
-    retry: 3,
-    retryDelay: 1000,
   });
-
-  console.log('Homepage data:', {
-    categoriesResponse,
-    categoriesLoading,
-    categoriesError,
-    featuredProducts,
-    productsLoading,
-    productsError
-  });
-
-  const categories = categoriesResponse?.data || [];
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
+    <div className="min-h-screen bg-white">
+      {/* Hero Section with Modern Design */}
       <HeroSection />
 
-      {/* Promo Banner */}
-      <PromoBanner />
+      {/* Trust Badges */}
+      <TrustBadges />
 
-      {/* Categories Section */}
-      <section className="py-16 bg-gray-50">
+      {/* Categories Section - Inspired by Amazon */}
+      <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Shop by Category
-            </h2>
-            <p className="text-lg text-gray-600">
-              Discover our wide range of product categories
-            </p>
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                Shop by Category
+              </h2>
+              <p className="text-gray-600 mt-2">Find exactly what you're looking for</p>
+            </div>
+            <Link
+              href="/categories"
+              className="hidden md:flex items-center text-blue-600 hover:text-blue-700 font-medium"
+            >
+              See all categories
+              <svg className="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </Link>
           </div>
 
-          {categoriesError && (
-            <div className="mb-8 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              Error loading categories: {categoriesError.message}
-            </div>
-          )}
-
           {categoriesLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="animate-pulse">
-                  <div className="bg-gray-200 rounded-lg h-32 mb-4"></div>
+                  <div className="bg-gray-200 rounded-xl h-24 mb-3"></div>
                   <div className="h-4 bg-gray-200 rounded"></div>
                 </div>
               ))}
             </div>
-          ) : categories.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {categories.slice(0, 6).map((category) => (
                 <CategoryCard key={category.id} category={category} />
               ))}
             </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📂</div>
-              <h3 className="text-xl font-medium text-gray-900 mb-2">No categories available</h3>
-              <p className="text-gray-600">Categories will appear here once they are added.</p>
-            </div>
           )}
-
-          <div className="text-center mt-8">
-            <Link
-              href="/categories"
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-            >
-              View All Categories
-            </Link>
-          </div>
         </div>
       </section>
 
-      {/* Featured Products */}
+      {/* Flash Deals Section - Inspired by e-commerce platforms */}
+      <DealsSection />
+
+      {/* Featured Products - Amazon/Shopify Style */}
       <FeaturedProducts 
         products={featuredProducts?.data?.products || []} 
         isLoading={productsLoading} 
       />
 
-      {/* Latest Products */}
+      {/* New Arrivals - Modern Grid Layout */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Latest Arrivals
-            </h2>
-            <p className="text-lg text-gray-600">
-              Check out our newest products
-            </p>
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                New Arrivals
+              </h2>
+              <p className="text-gray-600 mt-2">Fresh products just for you</p>
+            </div>
+            <Link
+              href="/products?sort_by=created_at&sort_order=desc"
+              className="text-blue-600 hover:text-blue-700 font-medium flex items-center"
+            >
+              View all
+              <svg className="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </Link>
           </div>
 
-          {latestError && (
-            <div className="mb-8 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              Error loading latest products: {latestError.message}
-            </div>
-          )}
-
           {latestLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="bg-gray-200 rounded-lg h-64 mb-4"></div>
                   <div className="h-4 bg-gray-200 rounded mb-2"></div>
@@ -152,25 +145,19 @@ export default function HomePage() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {latestProducts?.data?.products?.map((product) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {latestProducts?.data?.products?.slice(0, 6).map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
           )}
-
-          <div className="text-center mt-8">
-            <Link
-              href="/products"
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-blue-600 bg-blue-100 hover:bg-blue-200 transition-colors"
-            >
-              View All Products
-            </Link>
-          </div>
         </div>
       </section>
 
-      {/* Newsletter */}
+      {/* Customer Testimonials */}
+      <TestimonialsSection />
+
+      {/* Newsletter - Modern Design */}
       <Newsletter />
     </div>
   );

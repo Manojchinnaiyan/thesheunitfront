@@ -10,15 +10,15 @@ export function PromoBanner() {
           <div className="flex items-center space-x-4">
             <span className="text-2xl animate-pulse">🔥</span>
             <div>
-              <p className="font-bold text-lg">Summer Sale - Up to 50% Off!</p>
-              <p className="text-sm opacity-90">Free shipping on orders over $50</p>
+              <p className="font-bold text-lg">Welcome to TheShe Unit!</p>
+              <p className="text-sm opacity-90">Your modern e-commerce platform</p>
             </div>
           </div>
           <Link
-            href="/products?is_featured=true"
+            href="/products"
             className="hidden sm:inline-flex items-center px-6 py-2 bg-white text-red-600 font-medium rounded-full hover:bg-gray-100 transition-colors"
           >
-            Shop Sale
+            Shop Now
           </Link>
         </div>
       </div>

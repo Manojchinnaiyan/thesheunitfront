@@ -8,9 +8,12 @@ export { cartService, CartService } from './cart';
 export { ordersService, OrdersService } from './orders';
 export { categoriesService, CategoriesService } from './categories';
 
-// Export service types
+// Export address service
+export { addressService, AddressService } from './address';
+
+// Export types
 export type { CreateOrderRequest } from './orders';
-export type { CategoriesResponse, CategoryResponse, CategoryTree } from './categories';
+export type { CategoriesApiResponse } from './categories';
 
 // Re-export types from @repo/types for convenience
 export type {
@@ -30,6 +33,3 @@ export type {
   PaginatedResponse,
   ApiResponse
 } from '@repo/types';
-
-// Export address service
-export { addressService, AddressService } from './address';
