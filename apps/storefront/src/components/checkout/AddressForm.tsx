@@ -27,7 +27,7 @@ export function AddressForm({
     city: initialData.city || '',
     state: initialData.state || '',
     postal_code: initialData.postal_code || '',
-    country: initialData.country || 'India',
+    country: initialData.country || 'IN', // Use country code instead of name
     phone: initialData.phone || '',
   });
 
@@ -75,12 +75,9 @@ export function AddressForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Name Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="first_name" className={labelClassName}>
-            First Name *
-          </label>
+          <label htmlFor="first_name" className={labelClassName}>First Name *</label>
           <input
             type="text"
             id="first_name"
@@ -95,9 +92,7 @@ export function AddressForm({
         </div>
 
         <div>
-          <label htmlFor="last_name" className={labelClassName}>
-            Last Name *
-          </label>
+          <label htmlFor="last_name" className={labelClassName}>Last Name *</label>
           <input
             type="text"
             id="last_name"
@@ -112,11 +107,8 @@ export function AddressForm({
         </div>
       </div>
 
-      {/* Company Field */}
       <div>
-        <label htmlFor="company" className={labelClassName}>
-          Company (Optional)
-        </label>
+        <label htmlFor="company" className={labelClassName}>Company (Optional)</label>
         <input
           type="text"
           id="company"
@@ -129,11 +121,8 @@ export function AddressForm({
         />
       </div>
 
-      {/* Address Fields */}
       <div>
-        <label htmlFor="address_line_1" className={labelClassName}>
-          Address Line 1 *
-        </label>
+        <label htmlFor="address_line_1" className={labelClassName}>Address Line 1 *</label>
         <input
           type="text"
           id="address_line_1"
@@ -148,9 +137,7 @@ export function AddressForm({
       </div>
 
       <div>
-        <label htmlFor="address_line_2" className={labelClassName}>
-          Address Line 2 (Optional)
-        </label>
+        <label htmlFor="address_line_2" className={labelClassName}>Address Line 2 (Optional)</label>
         <input
           type="text"
           id="address_line_2"
@@ -163,12 +150,9 @@ export function AddressForm({
         />
       </div>
 
-      {/* City, State, Postal Code */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label htmlFor="city" className={labelClassName}>
-            City *
-          </label>
+          <label htmlFor="city" className={labelClassName}>City *</label>
           <input
             type="text"
             id="city"
@@ -183,9 +167,7 @@ export function AddressForm({
         </div>
 
         <div>
-          <label htmlFor="state" className={labelClassName}>
-            State *
-          </label>
+          <label htmlFor="state" className={labelClassName}>State *</label>
           <input
             type="text"
             id="state"
@@ -200,9 +182,7 @@ export function AddressForm({
         </div>
 
         <div>
-          <label htmlFor="postal_code" className={labelClassName}>
-            Postal Code *
-          </label>
+          <label htmlFor="postal_code" className={labelClassName}>Postal Code *</label>
           <input
             type="text"
             id="postal_code"
@@ -217,12 +197,9 @@ export function AddressForm({
         </div>
       </div>
 
-      {/* Country and Phone */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="country" className={labelClassName}>
-            Country *
-          </label>
+          <label htmlFor="country" className={labelClassName}>Country *</label>
           <select
             id="country"
             name="country"
@@ -232,24 +209,22 @@ export function AddressForm({
             disabled={isLoading}
           >
             <option value="">Select a country</option>
-            <option value="India">India</option>
-            <option value="United States">United States</option>
-            <option value="United Kingdom">United Kingdom</option>
-            <option value="Canada">Canada</option>
-            <option value="Australia">Australia</option>
-            <option value="Germany">Germany</option>
-            <option value="France">France</option>
-            <option value="Japan">Japan</option>
-            <option value="Singapore">Singapore</option>
-            <option value="UAE">United Arab Emirates</option>
+            <option value="IN">India</option>
+            <option value="US">United States</option>
+            <option value="GB">United Kingdom</option>
+            <option value="CA">Canada</option>
+            <option value="AU">Australia</option>
+            <option value="DE">Germany</option>
+            <option value="FR">France</option>
+            <option value="JP">Japan</option>
+            <option value="SG">Singapore</option>
+            <option value="AE">United Arab Emirates</option>
           </select>
           {errors.country && <p className={errorClassName}>{errors.country}</p>}
         </div>
 
         <div>
-          <label htmlFor="phone" className={labelClassName}>
-            Phone Number (Optional)
-          </label>
+          <label htmlFor="phone" className={labelClassName}>Phone Number (Optional)</label>
           <input
             type="tel"
             id="phone"
@@ -263,7 +238,6 @@ export function AddressForm({
         </div>
       </div>
 
-      {/* Form Actions */}
       <div className="flex justify-end space-x-3 pt-4">
         {onCancel && (
           <button
