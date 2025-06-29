@@ -1,434 +1,471 @@
-# Step 1 Fix: Correct Backend Field Names
-# Navigate to storefront
-cd apps/storefront
+# Complete fix for the Set Default Address issue
 
-# Fix the AddressForm to match exact backend field names
-cat > src/components/checkout/AddressForm.tsx << 'EOF'
+echo "🔧 Fixing Set Default Address functionality..."
+
+# Step 1: Update types to include the missing 'type' field
+cat > packages/types/address_update.ts << 'EOF'
+// Add this to your existing packages/types/index.ts file
+
+export interface UserAddress extends AddressForm {
+  id: number;
+  user_id: number;
+  type: 'shipping' | 'billing';  // ✅ ADD THIS LINE!
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+EOF
+
+# Step 2: Fix the API service to send type parameter
+cat > packages/api/address_complete_fix.ts << 'EOF'
+import { apiClient } from './client';
+import { API_ENDPOINTS } from '@repo/config';
+import type { UserAddress, AddressForm, ApiResponse } from '@repo/types';
+
+export class AddressService {
+  async getAddresses(): Promise<UserAddress[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<UserAddress[]>>(API_ENDPOINTS.USER_ADDRESSES);
+      
+      if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      } else if (Array.isArray(response)) {
+        return response;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch addresses:', error);
+      throw error;
+    }
+  }
+
+  async createAddress(addressData: AddressForm): Promise<UserAddress> {
+    try {
+      const response = await apiClient.post<ApiResponse<UserAddress>>(API_ENDPOINTS.USER_ADDRESSES, addressData);
+      
+      if (response.data) {
+        return response.data;
+      }
+      
+      throw new Error('Invalid address creation response');
+    } catch (error) {
+      console.error('Failed to create address:', error);
+      throw error;
+    }
+  }
+
+  async updateAddress(id: number, addressData: AddressForm): Promise<UserAddress> {
+    try {
+      const response = await apiClient.put<ApiResponse<UserAddress>>(`${API_ENDPOINTS.USER_ADDRESSES}/${id}`, addressData);
+      
+      if (response.data) {
+        return response.data;
+      }
+      
+      throw new Error('Invalid address update response');
+    } catch (error) {
+      console.error('Failed to update address:', error);
+      throw error;
+    }
+  }
+
+  async deleteAddress(id: number): Promise<void> {
+    try {
+      await apiClient.delete(`${API_ENDPOINTS.USER_ADDRESSES}/${id}`);
+    } catch (error) {
+      console.error('Failed to delete address:', error);
+      throw error;
+    }
+  }
+
+  // ✅ FIXED: Now properly sends the type parameter
+  async setDefaultAddress(id: number, type: 'shipping' | 'billing' = 'shipping'): Promise<UserAddress> {
+    try {
+      console.log('Setting default address:', { id, type }); // Debug log
+      
+      const response = await apiClient.put<ApiResponse<UserAddress>>(
+        `${API_ENDPOINTS.USER_ADDRESSES}/${id}/default`,
+        { type } // ✅ Send the type in JSON body
+      );
+      
+      if (response.data) {
+        return response.data;
+      }
+      
+      throw new Error('Invalid set default address response');
+    } catch (error) {
+      console.error('Failed to set default address:', error);
+      throw error;
+    }
+  }
+}
+
+export const addressService = new AddressService();
+EOF
+
+# Step 3: Fix the address store
+cat > apps/storefront/src/store/address_complete_fix.ts << 'EOF'
+import { create } from 'zustand';
+import { addressService } from '@repo/api';
+import type { UserAddress, AddressForm } from '@repo/types';
+
+interface AddressState {
+  addresses: UserAddress[];
+  isLoading: boolean;
+  error: string | null;
+  lastNotification: string | null;
+}
+
+interface AddressActions {
+  fetchAddresses: () => Promise<void>;
+  createAddress: (addressData: AddressForm) => Promise<UserAddress>;
+  updateAddress: (id: number, addressData: AddressForm) => Promise<UserAddress>;
+  deleteAddress: (id: number) => Promise<void>;
+  setDefaultAddress: (id: number, type?: 'shipping' | 'billing') => Promise<void>; // ✅ FIXED signature
+  clearError: () => void;
+  clearNotification: () => void;
+}
+
+export const useAddressStore = create<AddressState & AddressActions>((set, get) => ({
+  addresses: [],
+  isLoading: false,
+  error: null,
+  lastNotification: null,
+
+  fetchAddresses: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const addresses = await addressService.getAddresses();
+      console.log('Fetched addresses:', addresses);
+      set({ addresses, error: null });
+    } catch (error: any) {
+      console.error('Failed to fetch addresses:', error);
+      set({ 
+        addresses: [], 
+        error: error.message || 'Failed to fetch addresses' 
+      });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  createAddress: async (addressData: AddressForm) => {
+    set({ isLoading: true, error: null });
+    try {
+      const newAddress = await addressService.createAddress(addressData);
+      console.log('Created address:', newAddress);
+      
+      set(state => ({ 
+        addresses: [...state.addresses, newAddress],
+        error: null,
+        lastNotification: 'Address added successfully!' 
+      }));
+      
+      setTimeout(() => {
+        set({ lastNotification: null });
+      }, 3000);
+      
+      return newAddress;
+    } catch (error: any) {
+      console.error('Failed to create address:', error);
+      set({ error: error.message || 'Failed to create address' });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateAddress: async (id: number, addressData: AddressForm) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedAddress = await addressService.updateAddress(id, addressData);
+      console.log('Updated address:', updatedAddress);
+      
+      set(state => ({
+        addresses: state.addresses.map(addr => 
+          addr.id === id ? updatedAddress : addr
+        ),
+        error: null,
+        lastNotification: 'Address updated successfully!'
+      }));
+      
+      setTimeout(() => {
+        set({ lastNotification: null });
+      }, 3000);
+      
+      return updatedAddress;
+    } catch (error: any) {
+      console.error('Failed to update address:', error);
+      set({ error: error.message || 'Failed to update address' });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  deleteAddress: async (id: number) => {
+    set({ isLoading: true, error: null });
+    try {
+      await addressService.deleteAddress(id);
+      console.log('Deleted address:', id);
+      
+      set(state => ({
+        addresses: state.addresses.filter(addr => addr.id !== id),
+        error: null,
+        lastNotification: 'Address deleted successfully!'
+      }));
+      
+      setTimeout(() => {
+        set({ lastNotification: null });
+      }, 3000);
+    } catch (error: any) {
+      console.error('Failed to delete address:', error);
+      set({ error: error.message || 'Failed to delete address' });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // ✅ COMPLETELY FIXED setDefaultAddress function
+  setDefaultAddress: async (id: number, type?: 'shipping' | 'billing') => {
+    set({ isLoading: true, error: null });
+    try {
+      // If no type provided, try to get it from the existing address
+      if (!type) {
+        const existingAddress = get().addresses.find(addr => addr.id === id);
+        type = existingAddress?.type || 'shipping';
+      }
+      
+      console.log('Setting default address:', { id, type }); // Debug log
+      
+      // Call API with type parameter
+      const updatedAddress = await addressService.setDefaultAddress(id, type);
+      console.log('API returned:', updatedAddress);
+      
+      // Update state: only addresses of the same type should be affected
+      set(state => ({
+        addresses: state.addresses.map(addr => ({
+          ...addr,
+          is_default: addr.type === type ? addr.id === id : addr.is_default
+        })),
+        error: null,
+        lastNotification: `Default ${type} address updated!`
+      }));
+      
+      setTimeout(() => {
+        set({ lastNotification: null });
+      }, 3000);
+      
+    } catch (error: any) {
+      console.error('Failed to set default address:', error);
+      set({ error: error.message || 'Failed to set default address' });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  clearError: () => {
+    set({ error: null });
+  },
+
+  clearNotification: () => {
+    set({ lastNotification: null });
+  },
+}));
+EOF
+
+# Step 4: Fix the AddressCard component
+cat > apps/storefront/src/components/profile/AddressCard_fixed.tsx << 'EOF'
 'use client';
 
 import { useState } from 'react';
+import { useAddressStore } from '@/store/address';
+import { AddressForm } from '@/components/checkout/AddressForm';
+import type { UserAddress } from '@repo/types';
 
-// Match exact backend CreateAddressRequest structure
-interface AddressFormData {
-  type: 'shipping' | 'billing';
-  first_name: string;
-  last_name: string;
-  company?: string;
-  address_line1: string;  // Backend expects "address_line1" (no underscore)
-  address_line2?: string; // Backend expects "address_line2" (no underscore)
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string; // 2-letter ISO code
-  phone?: string;
-  is_default?: boolean;
+interface AddressCardProps {
+  address: UserAddress;
+  onEdit?: (address: UserAddress) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (address: UserAddress) => void;
 }
 
-interface AddressFormProps {
-  initialData?: Partial<AddressFormData>;
-  onSubmit: (data: AddressFormData) => void;
-  onCancel?: () => void;
-  submitLabel?: string;
-  isLoading?: boolean;
-  showTypeSelection?: boolean;
-}
+export function AddressCard({ 
+  address, 
+  onEdit, 
+  selectable = false, 
+  selected = false, 
+  onSelect 
+}: AddressCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const { deleteAddress, setDefaultAddress, updateAddress, isLoading } = useAddressStore();
 
-export function AddressForm({
-  initialData = {},
-  onSubmit,
-  onCancel,
-  submitLabel = 'Save Address',
-  isLoading = false,
-  showTypeSelection = true
-}: AddressFormProps) {
-  const [formData, setFormData] = useState<AddressFormData>({
-    type: initialData.type || 'shipping',
-    first_name: initialData.first_name || '',
-    last_name: initialData.last_name || '',
-    company: initialData.company || '',
-    address_line1: initialData.address_line1 || '', // Correct field name
-    address_line2: initialData.address_line2 || '', // Correct field name
-    city: initialData.city || '',
-    state: initialData.state || '',
-    postal_code: initialData.postal_code || '',
-    country: initialData.country || 'IN', // Default to India (2-letter code)
-    phone: initialData.phone || '',
-    is_default: initialData.is_default || false,
-  });
-
-  const [errors, setErrors] = useState<Partial<AddressFormData>>({});
-
-  // Country options with 2-letter ISO codes
-  const countries = [
-    { code: 'IN', name: 'India' },
-    { code: 'US', name: 'United States' },
-    { code: 'GB', name: 'United Kingdom' },
-    { code: 'CA', name: 'Canada' },
-    { code: 'AU', name: 'Australia' },
-    { code: 'DE', name: 'Germany' },
-    { code: 'FR', name: 'France' },
-    { code: 'JP', name: 'Japan' },
-    { code: 'SG', name: 'Singapore' },
-    { code: 'AE', name: 'United Arab Emirates' }
-  ];
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const target = e.target as HTMLInputElement;
-      setFormData(prev => ({ ...prev, [name]: target.checked }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
-    
-    // Clear error when user starts typing
-    if (errors[name as keyof AddressFormData]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this address?')) {
+      try {
+        await deleteAddress(address.id);
+      } catch (error) {
+        console.error('Failed to delete address:', error);
+      }
     }
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Partial<AddressFormData> = {};
-
-    // Backend validation requirements
-    if (!formData.type) {
-      newErrors.type = 'Address type is required';
-    }
-    if (!formData.first_name.trim()) {
-      newErrors.first_name = 'First name is required';
-    }
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = 'Last name is required';
-    }
-    if (!formData.address_line1.trim()) { // Correct field name
-      newErrors.address_line1 = 'Address line 1 is required';
-    }
-    if (!formData.city.trim()) {
-      newErrors.city = 'City is required';
-    }
-    if (!formData.state.trim()) {
-      newErrors.state = 'State is required';
-    }
-    if (!formData.postal_code.trim()) {
-      newErrors.postal_code = 'Postal code is required';
-    }
-    if (!formData.country.trim()) {
-      newErrors.country = 'Country is required';
-    } else if (formData.country.length !== 2) {
-      newErrors.country = 'Country must be a 2-letter code';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('📝 Form submitted with data:', formData);
-    
-    if (validateForm()) {
-      onSubmit(formData);
-    } else {
-      console.log('❌ Form validation failed:', errors);
+  // ✅ FIXED: Now passes the address type correctly
+  const handleSetDefault = async () => {
+    try {
+      console.log('Setting default for address:', address); // Debug log
+      await setDefaultAddress(address.id, address.type); // ✅ Pass the type!
+    } catch (error) {
+      console.error('Failed to set default address:', error);
     }
   };
+
+  const handleEditSave = async (addressData: any) => {
+    try {
+      await updateAddress(address.id, addressData);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to update address:', error);
+    }
+  };
+
+  const handleSelect = () => {
+    if (selectable && onSelect) {
+      onSelect(address);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Address</h3>
+        <AddressForm
+          initialData={address}
+          onSubmit={handleEditSave}
+          onCancel={() => setIsEditing(false)}
+          submitLabel="Update Address"
+          isLoading={isLoading}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white p-6 rounded-lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Address Type Selection */}
-        {showTypeSelection && (
-          <div>
-            <label htmlFor="type" className="block text-sm font-medium text-gray-700">
-              Address Type *
-            </label>
-            <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                errors.type ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              disabled={isLoading}
-            >
-              <option value="shipping">Shipping Address</option>
-              <option value="billing">Billing Address</option>
-            </select>
-            {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
-          </div>
+    <div 
+      className={`bg-white border rounded-lg p-6 transition-all ${
+        selectable 
+          ? `cursor-pointer hover:border-blue-300 ${
+              selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+            }`
+          : 'border-gray-200'
+      }`}
+      onClick={handleSelect}
+    >
+      {/* Selection indicator */}
+      {selectable && (
+        <div className="flex items-center mb-3">
+          <input
+            type="radio"
+            checked={selected}
+            onChange={handleSelect}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+          />
+          <span className="ml-2 text-sm font-medium text-gray-700">
+            {selected ? 'Selected' : 'Select this address'}
+          </span>
+        </div>
+      )}
+
+      {/* Address type and default badges */}
+      <div className="flex items-center gap-2 mb-3">
+        {/* Address type badge */}
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          address.type === 'shipping' 
+            ? 'bg-blue-100 text-blue-800' 
+            : 'bg-purple-100 text-purple-800'
+        }`}>
+          {address.type === 'shipping' ? '📦 Shipping' : '💳 Billing'}
+        </span>
+        
+        {/* Default badge */}
+        {address.is_default && (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            ✓ Default
+          </span>
         )}
+      </div>
 
-        {/* Name Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">
-              First Name *
-            </label>
-            <input
-              type="text"
-              id="first_name"
-              name="first_name"
-              value={formData.first_name}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                errors.first_name ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              disabled={isLoading}
-              placeholder="Enter first name"
-            />
-            {errors.first_name && <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>}
-          </div>
+      {/* Address details */}
+      <div className="space-y-1 text-sm text-gray-600">
+        <p className="font-medium text-gray-900">
+          {address.first_name} {address.last_name}
+        </p>
+        {address.company && <p>{address.company}</p>}
+        <p>{address.address_line_1}</p>
+        {address.address_line_2 && <p>{address.address_line_2}</p>}
+        <p>{address.city}, {address.state} {address.postal_code}</p>
+        <p>{address.country}</p>
+        {address.phone && <p>Phone: {address.phone}</p>}
+      </div>
 
-          <div>
-            <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">
-              Last Name *
-            </label>
-            <input
-              type="text"
-              id="last_name"
-              name="last_name"
-              value={formData.last_name}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                errors.last_name ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              disabled={isLoading}
-              placeholder="Enter last name"
-            />
-            {errors.last_name && <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>}
-          </div>
-        </div>
-
-        {/* Company Field */}
-        <div>
-          <label htmlFor="company" className="block text-sm font-medium text-gray-700">
-            Company (Optional)
-          </label>
-          <input
-            type="text"
-            id="company"
-            name="company"
-            value={formData.company}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            disabled={isLoading}
-            placeholder="Company name"
-          />
-        </div>
-
-        {/* Address Fields - CORRECTED FIELD NAMES */}
-        <div>
-          <label htmlFor="address_line1" className="block text-sm font-medium text-gray-700">
-            Address Line 1 *
-          </label>
-          <input
-            type="text"
-            id="address_line1"
-            name="address_line1"
-            value={formData.address_line1}
-            onChange={handleChange}
-            className={`mt-1 block w-full px-3 py-2 border ${
-              errors.address_line1 ? 'border-red-300' : 'border-gray-300'
-            } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-            disabled={isLoading}
-            placeholder="Street address, building number"
-          />
-          {errors.address_line1 && <p className="mt-1 text-sm text-red-600">{errors.address_line1}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="address_line2" className="block text-sm font-medium text-gray-700">
-            Address Line 2 (Optional)
-          </label>
-          <input
-            type="text"
-            id="address_line2"
-            name="address_line2"
-            value={formData.address_line2}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            disabled={isLoading}
-            placeholder="Apartment, suite, unit, etc."
-          />
-        </div>
-
-        {/* City, State, Postal Code */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-              City *
-            </label>
-            <input
-              type="text"
-              id="city"
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                errors.city ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              disabled={isLoading}
-              placeholder="City"
-            />
-            {errors.city && <p className="mt-1 text-sm text-red-600">{errors.city}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-              State/Province *
-            </label>
-            <input
-              type="text"
-              id="state"
-              name="state"
-              value={formData.state}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                errors.state ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              disabled={isLoading}
-              placeholder="State"
-            />
-            {errors.state && <p className="mt-1 text-sm text-red-600">{errors.state}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="postal_code" className="block text-sm font-medium text-gray-700">
-              Postal Code *
-            </label>
-            <input
-              type="text"
-              id="postal_code"
-              name="postal_code"
-              value={formData.postal_code}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                errors.postal_code ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              disabled={isLoading}
-              placeholder="Postal code"
-            />
-            {errors.postal_code && <p className="mt-1 text-sm text-red-600">{errors.postal_code}</p>}
-          </div>
-        </div>
-
-        {/* Country and Phone */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-              Country *
-            </label>
-            <select
-              id="country"
-              name="country"
-              value={formData.country}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                errors.country ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              disabled={isLoading}
-            >
-              {countries.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
-            {errors.country && <p className="mt-1 text-sm text-red-600">{errors.country}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-              Phone (Optional)
-            </label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              disabled={isLoading}
-              placeholder="+91 98765 43210"
-            />
-          </div>
-        </div>
-
-        {/* Default Address Checkbox */}
-        <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              name="is_default"
-              checked={formData.is_default}
-              onChange={handleChange}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              disabled={isLoading}
-            />
-            <span className="ml-2 text-sm text-gray-700">
-              Set as default {formData.type} address
-            </span>
-          </label>
-        </div>
-
-        {/* Form Actions */}
-        <div className="flex justify-end space-x-3 pt-4 border-t">
-          {onCancel && (
+      {/* Actions */}
+      {!selectable && (
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+          <div className="flex space-x-2">
             <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              onClick={() => setIsEditing(true)}
+              className="text-sm text-blue-600 hover:text-blue-500"
               disabled={isLoading}
             >
-              Cancel
+              Edit
             </button>
-          )}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? (
-              <span className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Saving...
-              </span>
-            ) : (
-              submitLabel
+            {!address.is_default && (
+              <button
+                onClick={handleSetDefault}
+                className="text-sm text-green-600 hover:text-green-500"
+                disabled={isLoading}
+              >
+                Set as Default {address.type === 'shipping' ? 'Shipping' : 'Billing'}
+              </button>
             )}
+          </div>
+          <button
+            onClick={handleDelete}
+            className="text-sm text-red-600 hover:text-red-500"
+            disabled={isLoading || address.is_default}
+            title={address.is_default ? 'Cannot delete default address' : 'Delete address'}
+          >
+            Delete
           </button>
         </div>
-      </form>
+      )}
     </div>
   );
 }
 EOF
 
-echo "✅ Step 1 FIXED: Corrected backend field names"
+echo "✅ All fixes applied!"
 echo ""
-echo "🔧 Critical fixes applied:"
-echo "   ✅ address_line1 (was address_line_1) - backend expects no underscore"
-echo "   ✅ address_line2 (was address_line_2) - backend expects no underscore"
-echo "   ✅ All other required fields properly named"
-echo "   ✅ 2-letter country codes (IN, US, GB, etc.)"
-echo "   ✅ Proper validation for all required fields"
+echo "🚀 Apply these changes to your files:"
 echo ""
-echo "📝 Test this now in your profile page - the validation error should be fixed!"
+echo "1. packages/types/index.ts - Add 'type' field to UserAddress:"
+echo "   type: 'shipping' | 'billing';"
 echo ""
-echo "Backend expects these exact field names:"
-echo "   • type: 'shipping' or 'billing'"
-echo "   • first_name: string"
-echo "   • last_name: string"
-echo "   • address_line1: string (NO underscore!)"
-echo "   • address_line2: string (NO underscore!)"
-echo "   • city: string"
-echo "   • state: string"
-echo "   • postal_code: string"
-echo "   • country: 2-letter code (IN, US, etc.)"
-echo "   • phone: string (optional)"
-echo "   • is_default: boolean"
+echo "2. packages/api/address.ts - Replace with address_complete_fix.ts content"
+echo ""
+echo "3. apps/storefront/src/store/address.ts - Replace with address_complete_fix.ts content"
+echo ""
+echo "4. apps/storefront/src/components/profile/AddressCard.tsx - Replace with AddressCard_fixed.tsx content"
+echo ""
+echo "🔍 Key fixes:"
+echo "• API now sends {\"type\": \"shipping\"} in JSON body"
+echo "• Store correctly handles type-specific default setting"
+echo "• AddressCard passes address.type to setDefaultAddress"
+echo "• UI shows address type (shipping/billing) clearly"
+echo "• State management only affects addresses of same type"
+echo ""
+echo "After applying these changes, your 'Set as Default' should work correctly! 🎯"
