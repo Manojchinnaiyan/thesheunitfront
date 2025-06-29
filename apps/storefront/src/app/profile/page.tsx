@@ -6,6 +6,7 @@ import { useAddressStore } from "@/store/address";
 import { AddressCard } from "@/components/profile/AddressCard";
 import { AddressForm } from "@/components/checkout/AddressForm";
 import Link from "next/link";
+import { OrderList } from "@/components/profile/OrderList";
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuthStore();
@@ -264,22 +265,8 @@ export default function ProfilePage() {
 
           {/* Orders Tab */}
           {activeTab === "orders" && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                Order History
-              </h2>
-              <div className="text-center py-12">
-                <div className="text-4xl mb-4">📦</div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No orders yet
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  When you place orders, theyll appear here.
-                </p>
-                <Link href="/products" className="btn-primary">
-                  Start Shopping
-                </Link>
-              </div>
+            <div className="space-y-6">
+              <OrderList />
             </div>
           )}
 
