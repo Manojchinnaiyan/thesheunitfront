@@ -46,7 +46,7 @@ export function OrderList() {
     }
   };
 
-  const downloadInvoice = async (orderId: number, orderNumber: string) => {
+  const downloadInvoice = async (orderId: number) => {
     try {
       const token = localStorage.getItem("access_token");
       const response = await fetch(
@@ -59,22 +59,24 @@ export function OrderList() {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to download invoice");
+        throw new Error("Failed to load invoice");
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.style.display = "none";
-      a.href = url;
-      a.download = `invoice-${orderNumber}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Get the HTML content
+      const htmlContent = await response.text();
+
+      // Open in new window/tab
+      const newWindow = window.open("", "_blank");
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        newWindow.focus();
+      } else {
+        alert("Please allow popups to view the invoice, or try again.");
+      }
     } catch (error) {
-      console.error("Error downloading invoice:", error);
-      alert("Failed to download invoice. Please try again.");
+      console.error("Error loading invoice:", error);
+      alert("Failed to load invoice. Please try again.");
     }
   };
 

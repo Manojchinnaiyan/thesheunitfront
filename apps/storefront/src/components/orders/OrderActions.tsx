@@ -37,22 +37,27 @@ export function OrderActions({
       );
 
       if (!response.ok) {
-        throw new Error("Failed to download invoice");
+        throw new Error("Failed to load invoice");
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.style.display = "none";
-      a.href = url;
-      a.download = `invoice-${order.order_number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Get the HTML content
+      const htmlContent = await response.text();
+
+      // Open in new window/tab
+      const newWindow = window.open("", "_blank");
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        newWindow.focus();
+      } else {
+        // Fallback: Show in current window if popup blocked
+        document.open();
+        document.write(htmlContent);
+        document.close();
+      }
     } catch (error) {
-      console.error("Error downloading invoice:", error);
-      alert("Failed to download invoice. Please try again.");
+      console.error("Error loading invoice:", error);
+      alert("Failed to load invoice. Please try again.");
     } finally {
       setDownloadingInvoice(false);
     }
@@ -82,7 +87,7 @@ export function OrderActions({
               d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          {downloadingInvoice ? "Downloading..." : "Download Invoice"}
+          {downloadingInvoice ? "Loading..." : "View Invoice"}
         </button>
 
         {/* Track Order */}
