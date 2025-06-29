@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useAuthStore } from "@/store/auth";
-import { useCartStore } from "@/store/cart";
-import { useAddressStore } from "@/store/address";
-import { AddressForm } from "@/components/checkout/AddressForm";
-import { OrderSummary } from "@/components/checkout/OrderSummary";
-import { PaymentMethod } from "@/components/checkout/PaymentMethod";
-import { ShippingMethod } from "@/components/checkout/ShippingMethod";
-import { ordersService } from "@repo/api";
-import type { AddressForm as AddressFormType, UserAddress } from "@repo/types";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuthStore } from '@/store/auth';
+import { useCartStore } from '@/store/cart';
+import { useAddressStore } from '@/store/address';
+import { AddressForm } from '@/components/checkout/AddressForm';
+import { OrderSummary } from '@/components/checkout/OrderSummary';
+import { PaymentMethod } from '@/components/checkout/PaymentMethod';
+import { ShippingMethod } from '@/components/checkout/ShippingMethod';
+import { ordersService } from '@repo/api';
+import type { AddressForm as AddressFormType, UserAddress } from '@repo/types';
 
 // Define the correct API request type based on backend
 interface CreateOrderRequest {
@@ -49,39 +49,27 @@ interface CreateOrderRequest {
 export default function CheckoutPage() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
-  const {
-    cartData,
-    isLoading: cartLoading,
-    fetchCart,
-    clearCart,
-  } = useCartStore();
-  const {
-    addresses,
-    isLoading: addressLoading,
-    fetchAddresses,
-    createAddress,
-  } = useAddressStore();
+  const { cartData, isLoading: cartLoading, fetchCart, clearCart } = useCartStore();
+  const { addresses, isLoading: addressLoading, fetchAddresses, createAddress } = useAddressStore();
 
   // Checkout state
   const [currentStep, setCurrentStep] = useState(1);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   // Address management
-  const [selectedShippingAddress, setSelectedShippingAddress] =
-    useState<UserAddress | null>(null);
-  const [selectedBillingAddress, setSelectedBillingAddress] =
-    useState<UserAddress | null>(null);
+  const [selectedShippingAddress, setSelectedShippingAddress] = useState<UserAddress | null>(null);
+  const [selectedBillingAddress, setSelectedBillingAddress] = useState<UserAddress | null>(null);
   const [useShippingAsBilling, setUseShippingAsBilling] = useState(true);
   const [showNewShippingForm, setShowNewShippingForm] = useState(false);
   const [showNewBillingForm, setShowNewBillingForm] = useState(false);
 
   // Other form data
-  const [shippingMethod, setShippingMethod] = useState("standard");
+  const [shippingMethod, setShippingMethod] = useState('standard');
   const [shippingCost, setShippingCost] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState("razorpay");
-  const [notes, setNotes] = useState("");
-  const [couponCode, setCouponCode] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
+  const [notes, setNotes] = useState('');
+  const [couponCode, setCouponCode] = useState('');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -93,8 +81,7 @@ export default function CheckoutPage() {
   // Auto-select default shipping address
   useEffect(() => {
     if (addresses.length > 0 && !selectedShippingAddress) {
-      const defaultAddress =
-        addresses.find((addr) => addr.is_default) || addresses[0];
+      const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
       setSelectedShippingAddress(defaultAddress);
       if (useShippingAsBilling) {
         setSelectedBillingAddress(defaultAddress);
@@ -110,10 +97,7 @@ export default function CheckoutPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Checkout</h1>
           <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded">
             <p>Please sign in to continue with checkout.</p>
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 hover:text-blue-500 ml-1"
-            >
+            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500 ml-1">
               Sign in here
             </Link>
           </div>
@@ -123,20 +107,14 @@ export default function CheckoutPage() {
   }
 
   // Redirect if cart is empty
-  if (
-    !cartLoading &&
-    (!cartData || !cartData.items || cartData.items.length === 0)
-  ) {
+  if (!cartLoading && (!cartData || !cartData.items || cartData.items.length === 0)) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Checkout</h1>
           <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded">
             <p>Your cart is empty. Add some products before checking out.</p>
-            <Link
-              href="/products"
-              className="font-medium text-blue-600 hover:text-blue-500 ml-1"
-            >
+            <Link href="/products" className="font-medium text-blue-600 hover:text-blue-500 ml-1">
               Continue shopping
             </Link>
           </div>
@@ -148,31 +126,31 @@ export default function CheckoutPage() {
   // Handle new shipping address
   const handleNewShippingAddress = async (addressData: AddressFormType) => {
     try {
-      console.log("Creating new shipping address:", addressData);
+      console.log('Creating new shipping address:', addressData);
       const newAddress = await createAddress(addressData);
-      console.log("New shipping address created:", newAddress);
+      console.log('New shipping address created:', newAddress);
       setSelectedShippingAddress(newAddress);
       setShowNewShippingForm(false);
       if (useShippingAsBilling) {
         setSelectedBillingAddress(newAddress);
       }
     } catch (error) {
-      console.error("Failed to create shipping address:", error);
-      setError("Failed to save shipping address. Please try again.");
+      console.error('Failed to create shipping address:', error);
+      setError('Failed to save shipping address. Please try again.');
     }
   };
 
   // Handle new billing address
   const handleNewBillingAddress = async (addressData: AddressFormType) => {
     try {
-      console.log("Creating new billing address:", addressData);
+      console.log('Creating new billing address:', addressData);
       const newAddress = await createAddress(addressData);
-      console.log("New billing address created:", newAddress);
+      console.log('New billing address created:', newAddress);
       setSelectedBillingAddress(newAddress);
       setShowNewBillingForm(false);
     } catch (error) {
-      console.error("Failed to create billing address:", error);
-      setError("Failed to save billing address. Please try again.");
+      console.error('Failed to create billing address:', error);
+      setError('Failed to save billing address. Please try again.');
     }
   };
 
@@ -193,20 +171,18 @@ export default function CheckoutPage() {
   // Handle order placement with proper API integration
   const handlePlaceOrder = async () => {
     if (!selectedShippingAddress || !cartData) {
-      setError("Please select a shipping address.");
+      setError('Please select a shipping address.');
       return;
     }
 
-    const finalBillingAddress = useShippingAsBilling
-      ? selectedShippingAddress
-      : selectedBillingAddress;
+    const finalBillingAddress = useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress;
     if (!finalBillingAddress) {
-      setError("Please select a billing address.");
+      setError('Please select a billing address.');
       return;
     }
 
     setIsPlacingOrder(true);
-    setError("");
+    setError('');
 
     try {
       // Prepare order data in the correct format for the backend API
@@ -220,11 +196,11 @@ export default function CheckoutPage() {
         use_shipping_as_billing: useShippingAsBilling,
       };
 
-      console.log("🚀 Creating order with data:", orderData);
-
+      console.log('🚀 Creating order with data:', orderData);
+      
       // Call the backend API
       const response = await ordersService.createOrder(orderData);
-      console.log("✅ Order creation response:", response);
+      console.log('✅ Order creation response:', response);
 
       // Handle the response based on your backend API structure
       let orderId;
@@ -233,24 +209,21 @@ export default function CheckoutPage() {
       } else if (response.id) {
         orderId = response.id;
       } else {
-        throw new Error("Invalid order response: missing order ID");
+        throw new Error('Invalid order response: missing order ID');
       }
 
-      console.log("✅ Order created successfully with ID:", orderId);
+      console.log('✅ Order created successfully with ID:', orderId);
 
       // Clear cart after successful order
       try {
         await clearCart();
-        console.log("✅ Cart cleared successfully");
+        console.log('✅ Cart cleared successfully');
       } catch (cartError) {
-        console.warn(
-          "⚠️ Failed to clear cart, but order was created:",
-          cartError
-        );
+        console.warn('⚠️ Failed to clear cart, but order was created:', cartError);
       }
 
       // Redirect based on payment method
-      if (paymentMethod === "cod") {
+      if (paymentMethod === 'cod') {
         // For COD, redirect to order confirmation
         router.push(`/orders/${orderId}/confirmation`);
       } else {
@@ -258,22 +231,22 @@ export default function CheckoutPage() {
         router.push(`/orders/${orderId}/payment`);
       }
     } catch (err: any) {
-      console.error("❌ Failed to place order:", err);
-
+      console.error('❌ Failed to place order:', err);
+      
       // Handle different types of errors
-      let errorMessage = "Failed to place order. Please try again.";
-
+      let errorMessage = 'Failed to place order. Please try again.';
+      
       if (err.response) {
         // HTTP error response
         const status = err.response.status;
         const data = err.response.data;
-
-        console.error("❌ HTTP Error:", { status, data });
-
+        
+        console.error('❌ HTTP Error:', { status, data });
+        
         if (status === 400 && data.error) {
           errorMessage = data.error;
         } else if (status === 401) {
-          errorMessage = "Please login to continue.";
+          errorMessage = 'Please login to continue.';
         } else if (status === 422 && data.details) {
           errorMessage = `Validation error: ${data.details}`;
         } else if (data.message) {
@@ -282,7 +255,7 @@ export default function CheckoutPage() {
       } else if (err.message) {
         errorMessage = err.message;
       }
-
+      
       setError(errorMessage);
     } finally {
       setIsPlacingOrder(false);
@@ -290,10 +263,10 @@ export default function CheckoutPage() {
   };
 
   const steps = [
-    { id: 1, name: "Shipping Address", icon: "📍" },
-    { id: 2, name: "Billing Address", icon: "💳" },
-    { id: 3, name: "Shipping & Payment", icon: "🚚" },
-    { id: 4, name: "Review Order", icon: "📋" },
+    { id: 1, name: 'Shipping Address', icon: '📍' },
+    { id: 2, name: 'Billing Address', icon: '💳' },
+    { id: 3, name: 'Shipping & Payment', icon: '🚚' },
+    { id: 4, name: 'Review Order', icon: '📋' },
   ];
 
   if (cartLoading || addressLoading) {
@@ -315,8 +288,8 @@ export default function CheckoutPage() {
         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-6">
           <div className="flex justify-between items-center">
             <span>{error}</span>
-            <button
-              onClick={() => setError("")}
+            <button 
+              onClick={() => setError('')}
               className="ml-2 text-red-500 hover:text-red-700 text-lg font-bold"
             >
               ×
@@ -332,36 +305,27 @@ export default function CheckoutPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between">
               {steps.map((step, stepIdx) => (
-                <div
-                  key={step.id}
-                  className={`flex items-center ${stepIdx < steps.length - 1 ? "flex-1" : ""}`}
-                >
+                <div key={step.id} className={`flex items-center ${stepIdx < steps.length - 1 ? 'flex-1' : ''}`}>
                   <div
                     className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-medium ${
                       currentStep >= step.id
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-200 text-gray-500"
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-500'
                     }`}
                   >
                     <span className="text-lg">{step.icon}</span>
                   </div>
                   <div className="ml-4 min-w-0 flex-1">
-                    <p
-                      className={`text-sm font-medium ${
-                        currentStep >= step.id
-                          ? "text-blue-600"
-                          : "text-gray-500"
-                      }`}
-                    >
+                    <p className={`text-sm font-medium ${
+                      currentStep >= step.id ? 'text-blue-600' : 'text-gray-500'
+                    }`}>
                       {step.name}
                     </p>
                   </div>
                   {stepIdx < steps.length - 1 && (
-                    <div
-                      className={`flex-1 ml-4 h-0.5 ${
-                        currentStep > step.id ? "bg-blue-600" : "bg-gray-200"
-                      }`}
-                    />
+                    <div className={`flex-1 ml-4 h-0.5 ${
+                      currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'
+                    }`} />
                   )}
                 </div>
               ))}
@@ -372,23 +336,19 @@ export default function CheckoutPage() {
           {currentStep === 1 && (
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-medium text-gray-900">
-                  Shipping Address
-                </h2>
+                <h2 className="text-lg font-medium text-gray-900">Shipping Address</h2>
                 <button
                   onClick={() => setShowNewShippingForm(!showNewShippingForm)}
                   className="text-sm text-blue-600 hover:text-blue-500"
                 >
-                  {showNewShippingForm ? "Cancel" : "+ Add New Address"}
+                  {showNewShippingForm ? 'Cancel' : '+ Add New Address'}
                 </button>
               </div>
 
               {/* New Address Form */}
               {showNewShippingForm && (
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                  <h3 className="text-md font-medium text-gray-900 mb-4">
-                    Add New Shipping Address
-                  </h3>
+                  <h3 className="text-md font-medium text-gray-900 mb-4">Add New Shipping Address</h3>
                   <AddressForm
                     onSubmit={handleNewShippingAddress}
                     onCancel={() => setShowNewShippingForm(false)}
@@ -401,16 +361,14 @@ export default function CheckoutPage() {
               {/* Existing Addresses */}
               {addresses.length > 0 && (
                 <div className="space-y-4 mb-6">
-                  <h3 className="text-md font-medium text-gray-900">
-                    Select from saved addresses:
-                  </h3>
+                  <h3 className="text-md font-medium text-gray-900">Select from saved addresses:</h3>
                   {addresses.map((address) => (
                     <div
                       key={address.id}
                       className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                         selectedShippingAddress?.id === address.id
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300"
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
                       }`}
                       onClick={() => {
                         setSelectedShippingAddress(address);
@@ -438,12 +396,8 @@ export default function CheckoutPage() {
                       <div className="ml-7 space-y-1 text-sm text-gray-600">
                         {address.company && <p>{address.company}</p>}
                         <p>{address.address_line_1}</p>
-                        {address.address_line_2 && (
-                          <p>{address.address_line_2}</p>
-                        )}
-                        <p>
-                          {address.city}, {address.state} {address.postal_code}
-                        </p>
+                        {address.address_line_2 && <p>{address.address_line_2}</p>}
+                        <p>{address.city}, {address.state} {address.postal_code}</p>
                         <p>{address.country}</p>
                         {address.phone && <p>Phone: {address.phone}</p>}
                       </div>
@@ -454,9 +408,7 @@ export default function CheckoutPage() {
 
               {addresses.length === 0 && !showNewShippingForm && (
                 <div className="text-center py-6">
-                  <p className="text-gray-500 mb-4">
-                    No saved addresses found.
-                  </p>
+                  <p className="text-gray-500 mb-4">No saved addresses found.</p>
                   <button
                     onClick={() => setShowNewShippingForm(true)}
                     className="btn-primary px-4 py-2"
@@ -482,9 +434,7 @@ export default function CheckoutPage() {
           {/* Step 2: Billing Address */}
           {currentStep === 2 && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-6">
-                Billing Address
-              </h2>
+              <h2 className="text-lg font-medium text-gray-900 mb-6">Billing Address</h2>
 
               {/* Use shipping as billing option */}
               <div className="mb-6">
@@ -510,23 +460,19 @@ export default function CheckoutPage() {
               {!useShippingAsBilling && (
                 <>
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-md font-medium text-gray-900">
-                      Select Billing Address
-                    </h3>
+                    <h3 className="text-md font-medium text-gray-900">Select Billing Address</h3>
                     <button
                       onClick={() => setShowNewBillingForm(!showNewBillingForm)}
                       className="text-sm text-blue-600 hover:text-blue-500"
                     >
-                      {showNewBillingForm ? "Cancel" : "+ Add New Address"}
+                      {showNewBillingForm ? 'Cancel' : '+ Add New Address'}
                     </button>
                   </div>
 
                   {/* New Billing Address Form */}
                   {showNewBillingForm && (
                     <div className="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                      <h3 className="text-md font-medium text-gray-900 mb-4">
-                        Add New Billing Address
-                      </h3>
+                      <h3 className="text-md font-medium text-gray-900 mb-4">Add New Billing Address</h3>
                       <AddressForm
                         onSubmit={handleNewBillingAddress}
                         onCancel={() => setShowNewBillingForm(false)}
@@ -544,17 +490,15 @@ export default function CheckoutPage() {
                           key={address.id}
                           className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                             selectedBillingAddress?.id === address.id
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-200 hover:border-gray-300"
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
                           }`}
                           onClick={() => setSelectedBillingAddress(address)}
                         >
                           <div className="flex items-center mb-2">
                             <input
                               type="radio"
-                              checked={
-                                selectedBillingAddress?.id === address.id
-                              }
+                              checked={selectedBillingAddress?.id === address.id}
                               onChange={() => {}}
                               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                             />
@@ -570,13 +514,8 @@ export default function CheckoutPage() {
                           <div className="ml-7 space-y-1 text-sm text-gray-600">
                             {address.company && <p>{address.company}</p>}
                             <p>{address.address_line_1}</p>
-                            {address.address_line_2 && (
-                              <p>{address.address_line_2}</p>
-                            )}
-                            <p>
-                              {address.city}, {address.state}{" "}
-                              {address.postal_code}
-                            </p>
+                            {address.address_line_2 && <p>{address.address_line_2}</p>}
+                            <p>{address.city}, {address.state} {address.postal_code}</p>
                             <p>{address.country}</p>
                             {address.phone && <p>Phone: {address.phone}</p>}
                           </div>
@@ -624,9 +563,7 @@ export default function CheckoutPage() {
               </div>
 
               <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Order Notes (Optional)
-                </h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Order Notes (Optional)</h3>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -638,9 +575,7 @@ export default function CheckoutPage() {
 
               {/* Coupon Code Section */}
               <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Coupon Code (Optional)
-                </h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Coupon Code (Optional)</h3>
                 <div className="flex space-x-3">
                   <input
                     type="text"
@@ -649,7 +584,9 @@ export default function CheckoutPage() {
                     placeholder="Enter coupon code"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
-                  <button className="btn-outline px-4 py-2">Apply</button>
+                  <button className="btn-outline px-4 py-2">
+                    Apply
+                  </button>
                 </div>
               </div>
 
@@ -673,40 +610,25 @@ export default function CheckoutPage() {
           {/* Step 4: Review Order */}
           {currentStep === 4 && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-6">
-                Review Your Order
-              </h2>
+              <h2 className="text-lg font-medium text-gray-900 mb-6">Review Your Order</h2>
 
               {/* Address Summary */}
               <div className="mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Shipping Address */}
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Shipping Address
-                    </h3>
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Shipping Address</h3>
                     {selectedShippingAddress && (
                       <div className="text-sm text-gray-600 space-y-1">
                         <p className="font-medium text-gray-900">
-                          {selectedShippingAddress.first_name}{" "}
-                          {selectedShippingAddress.last_name}
+                          {selectedShippingAddress.first_name} {selectedShippingAddress.last_name}
                         </p>
-                        {selectedShippingAddress.company && (
-                          <p>{selectedShippingAddress.company}</p>
-                        )}
+                        {selectedShippingAddress.company && <p>{selectedShippingAddress.company}</p>}
                         <p>{selectedShippingAddress.address_line_1}</p>
-                        {selectedShippingAddress.address_line_2 && (
-                          <p>{selectedShippingAddress.address_line_2}</p>
-                        )}
-                        <p>
-                          {selectedShippingAddress.city},{" "}
-                          {selectedShippingAddress.state}{" "}
-                          {selectedShippingAddress.postal_code}
-                        </p>
+                        {selectedShippingAddress.address_line_2 && <p>{selectedShippingAddress.address_line_2}</p>}
+                        <p>{selectedShippingAddress.city}, {selectedShippingAddress.state} {selectedShippingAddress.postal_code}</p>
                         <p>{selectedShippingAddress.country}</p>
-                        {selectedShippingAddress.phone && (
-                          <p>Phone: {selectedShippingAddress.phone}</p>
-                        )}
+                        {selectedShippingAddress.phone && <p>Phone: {selectedShippingAddress.phone}</p>}
                       </div>
                     )}
                     <button
@@ -719,109 +641,30 @@ export default function CheckoutPage() {
 
                   {/* Billing Address */}
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Billing Address
-                    </h3>
-                    {(useShippingAsBilling
-                      ? selectedShippingAddress
-                      : selectedBillingAddress) && (
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Billing Address</h3>
+                    {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress) && (
                       <div className="text-sm text-gray-600 space-y-1">
                         {useShippingAsBilling && (
-                          <p className="text-xs text-blue-600 mb-2">
-                            Same as shipping address
-                          </p>
+                          <p className="text-xs text-blue-600 mb-2">Same as shipping address</p>
                         )}
                         <p className="font-medium text-gray-900">
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.first_name
-                          }{" "}
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.last_name
-                          }
+                          {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.first_name}{' '}
+                          {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.last_name}
                         </p>
-                        {(useShippingAsBilling
-                          ? selectedShippingAddress
-                          : selectedBillingAddress
-                        )?.company && (
-                          <p>
-                            {
-                              (useShippingAsBilling
-                                ? selectedShippingAddress
-                                : selectedBillingAddress
-                              )?.company
-                            }
-                          </p>
-                        )}
+                        {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.company && 
+                          <p>{(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.company}</p>}
+                        <p>{(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.address_line_1}</p>
+                        {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.address_line_2 && 
+                          <p>{(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.address_line_2}</p>}
                         <p>
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.address_line_1
-                          }
+                          {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.city},{' '}
+                          {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.state}{' '}
+                          {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.postal_code}
                         </p>
-                        {(useShippingAsBilling
-                          ? selectedShippingAddress
-                          : selectedBillingAddress
-                        )?.address_line_2 && (
-                          <p>
-                            {
-                              (useShippingAsBilling
-                                ? selectedShippingAddress
-                                : selectedBillingAddress
-                              )?.address_line_2
-                            }
-                          </p>
-                        )}
-                        <p>
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.city
-                          }
-                          ,{" "}
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.state
-                          }{" "}
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.postal_code
-                          }
-                        </p>
-                        <p>
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.country
-                          }
-                        </p>
-                        {(useShippingAsBilling
-                          ? selectedShippingAddress
-                          : selectedBillingAddress
-                        )?.phone && (
-                          <p>
-                            Phone:{" "}
-                            {
-                              (useShippingAsBilling
-                                ? selectedShippingAddress
-                                : selectedBillingAddress
-                              )?.phone
-                            }
-                          </p>
-                        )}
+                        <p>{(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.country}</p>
+                        {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.phone && 
+                          <p>Phone: {(useShippingAsBilling ? selectedShippingAddress : selectedBillingAddress)?.phone}</p>}
+                      </div>
                       </div>
                     )}
                     <button
@@ -838,12 +681,8 @@ export default function CheckoutPage() {
               <div className="border-t border-gray-200 pt-6 mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Shipping Method
-                    </h3>
-                    <p className="text-sm text-gray-600 capitalize">
-                      {shippingMethod.replace("_", " ")}
-                    </p>
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Shipping Method</h3>
+                    <p className="text-sm text-gray-600 capitalize">{shippingMethod.replace('_', ' ')}</p>
                     <button
                       onClick={() => setCurrentStep(3)}
                       className="mt-2 text-sm text-blue-600 hover:text-blue-500"
@@ -852,12 +691,8 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Payment Method
-                    </h3>
-                    <p className="text-sm text-gray-600 capitalize">
-                      {paymentMethod}
-                    </p>
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Payment Method</h3>
+                    <p className="text-sm text-gray-600 capitalize">{paymentMethod}</p>
                     <button
                       onClick={() => setCurrentStep(3)}
                       className="mt-2 text-sm text-blue-600 hover:text-blue-500"
@@ -871,9 +706,7 @@ export default function CheckoutPage() {
               {/* Order Notes */}
               {notes && (
                 <div className="border-t border-gray-200 pt-6 mb-6">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">
-                    Order Notes
-                  </h3>
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">Order Notes</h3>
                   <p className="text-sm text-gray-600">{notes}</p>
                   <button
                     onClick={() => setCurrentStep(3)}
@@ -887,9 +720,7 @@ export default function CheckoutPage() {
               {/* Coupon Code */}
               {couponCode && (
                 <div className="border-t border-gray-200 pt-6 mb-6">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">
-                    Coupon Code
-                  </h3>
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">Coupon Code</h3>
                   <p className="text-sm text-green-600">{couponCode}</p>
                   <button
                     onClick={() => setCurrentStep(3)}
@@ -915,30 +746,14 @@ export default function CheckoutPage() {
                 >
                   {isPlacingOrder ? (
                     <span className="flex items-center">
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       Placing Order...
                     </span>
                   ) : (
-                    "Place Order"
+                    'Place Order'
                   )}
                 </button>
               </div>
@@ -949,7 +764,10 @@ export default function CheckoutPage() {
         {/* Order Summary Sidebar */}
         <div className="mt-10 lg:mt-0 lg:col-span-5">
           <div className="bg-white rounded-lg shadow p-6 sticky top-4">
-            <OrderSummary cartData={cartData} shippingCost={shippingCost} />
+            <OrderSummary 
+              cartData={cartData}
+              shippingCost={shippingCost}
+            />
           </div>
         </div>
       </div>

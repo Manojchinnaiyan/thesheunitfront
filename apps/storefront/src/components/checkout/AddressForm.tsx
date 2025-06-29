@@ -1,17 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
 import type { AddressForm as AddressFormType } from '@repo/types';
 
 interface AddressFormProps {
   initialData?: Partial<AddressFormType>;
-  onSubmit: (data: AddressFormType) => void | Promise<void>;
-  onCancel: () => void;
+  onSubmit: (data: AddressFormType) => void;
+  onCancel?: () => void;
   submitLabel?: string;
   isLoading?: boolean;
 }
@@ -32,14 +27,24 @@ export function AddressForm({
     city: initialData.city || '',
     state: initialData.state || '',
     postal_code: initialData.postal_code || '',
-    country: initialData.country || 'IN',
+    country: initialData.country || 'India',
     phone: initialData.phone || '',
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<AddressFormType>>({});
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error when user starts typing
+    if (errors[name as keyof AddressFormType]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+    const newErrors: Partial<AddressFormType> = {};
 
     if (!formData.first_name.trim()) newErrors.first_name = 'First name is required';
     if (!formData.last_name.trim()) newErrors.last_name = 'Last name is required';
@@ -49,218 +54,244 @@ export function AddressForm({
     if (!formData.postal_code.trim()) newErrors.postal_code = 'Postal code is required';
     if (!formData.country.trim()) newErrors.country = 'Country is required';
 
-    // Validate postal code format for India
-    if (formData.country === 'IN' && formData.postal_code) {
-      const pinCodeRegex = /^[1-9][0-9]{5}$/;
-      if (!pinCodeRegex.test(formData.postal_code)) {
-        newErrors.postal_code = 'Please enter a valid 6-digit PIN code';
-      }
-    }
-
-    // Validate phone number if provided
-    if (formData.phone && formData.phone.trim()) {
-      const phoneRegex = /^[+]?[0-9\s\-\(\)]{10,}$/;
-      if (!phoneRegex.test(formData.phone.trim())) {
-        newErrors.phone = 'Please enter a valid phone number';
-      }
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-
-    try {
-      await onSubmit(formData);
-    } catch (error) {
-      console.error('Failed to save address:', error);
+    if (validateForm()) {
+      onSubmit(formData);
     }
   };
 
-  const handleChange = (field: keyof AddressFormType, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  const inputClassName = (hasError: boolean) =>
+    `mt-1 block w-full px-3 py-2 border ${
+      hasError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+    } rounded-md shadow-sm focus:outline-none focus:ring-1 disabled:bg-gray-50 disabled:cursor-not-allowed`;
+
+  const labelClassName = "block text-sm font-medium text-gray-700 mb-1";
+  const errorClassName = "mt-1 text-sm text-red-600";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Name Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="first_name">First Name *</Label>
-          <Input
+          <label htmlFor="first_name" className={labelClassName}>
+            First Name *
+          </label>
+          <input
+            type="text"
             id="first_name"
+            name="first_name"
             value={formData.first_name}
-            onChange={(e) => handleChange('first_name', e.target.value)}
-            className={errors.first_name ? 'border-red-500' : ''}
+            onChange={handleChange}
+            className={inputClassName(!!errors.first_name)}
             disabled={isLoading}
+            placeholder="Enter your first name"
           />
-          {errors.first_name && <p className="text-red-500 text-sm mt-1">{errors.first_name}</p>}
+          {errors.first_name && <p className={errorClassName}>{errors.first_name}</p>}
         </div>
-        
+
         <div>
-          <Label htmlFor="last_name">Last Name *</Label>
-          <Input
+          <label htmlFor="last_name" className={labelClassName}>
+            Last Name *
+          </label>
+          <input
+            type="text"
             id="last_name"
+            name="last_name"
             value={formData.last_name}
-            onChange={(e) => handleChange('last_name', e.target.value)}
-            className={errors.last_name ? 'border-red-500' : ''}
+            onChange={handleChange}
+            className={inputClassName(!!errors.last_name)}
             disabled={isLoading}
+            placeholder="Enter your last name"
           />
-          {errors.last_name && <p className="text-red-500 text-sm mt-1">{errors.last_name}</p>}
+          {errors.last_name && <p className={errorClassName}>{errors.last_name}</p>}
         </div>
       </div>
 
-      {/* Company */}
+      {/* Company Field */}
       <div>
-        <Label htmlFor="company">Company (Optional)</Label>
-        <Input
+        <label htmlFor="company" className={labelClassName}>
+          Company (Optional)
+        </label>
+        <input
+          type="text"
           id="company"
+          name="company"
           value={formData.company}
-          onChange={(e) => handleChange('company', e.target.value)}
+          onChange={handleChange}
+          className={inputClassName(false)}
           disabled={isLoading}
-          placeholder="Company name"
+          placeholder="Enter company name"
         />
       </div>
 
-      {/* Address Lines */}
+      {/* Address Fields */}
       <div>
-        <Label htmlFor="address_line_1">Address Line 1 *</Label>
-        <Input
+        <label htmlFor="address_line_1" className={labelClassName}>
+          Address Line 1 *
+        </label>
+        <input
+          type="text"
           id="address_line_1"
+          name="address_line_1"
           value={formData.address_line_1}
-          onChange={(e) => handleChange('address_line_1', e.target.value)}
-          className={errors.address_line_1 ? 'border-red-500' : ''}
+          onChange={handleChange}
+          className={inputClassName(!!errors.address_line_1)}
           disabled={isLoading}
-          placeholder="Street address, P.O. Box, etc."
+          placeholder="Enter your street address"
         />
-        {errors.address_line_1 && <p className="text-red-500 text-sm mt-1">{errors.address_line_1}</p>}
+        {errors.address_line_1 && <p className={errorClassName}>{errors.address_line_1}</p>}
       </div>
 
       <div>
-        <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
-        <Input
+        <label htmlFor="address_line_2" className={labelClassName}>
+          Address Line 2 (Optional)
+        </label>
+        <input
+          type="text"
           id="address_line_2"
+          name="address_line_2"
           value={formData.address_line_2}
-          onChange={(e) => handleChange('address_line_2', e.target.value)}
+          onChange={handleChange}
+          className={inputClassName(false)}
           disabled={isLoading}
-          placeholder="Apartment, suite, unit, building, floor, etc."
+          placeholder="Apartment, suite, etc."
         />
       </div>
 
       {/* City, State, Postal Code */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <Label htmlFor="city">City *</Label>
-          <Input
+          <label htmlFor="city" className={labelClassName}>
+            City *
+          </label>
+          <input
+            type="text"
             id="city"
+            name="city"
             value={formData.city}
-            onChange={(e) => handleChange('city', e.target.value)}
-            className={errors.city ? 'border-red-500' : ''}
+            onChange={handleChange}
+            className={inputClassName(!!errors.city)}
             disabled={isLoading}
+            placeholder="Enter city"
           />
-          {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+          {errors.city && <p className={errorClassName}>{errors.city}</p>}
         </div>
-        
+
         <div>
-          <Label htmlFor="state">State *</Label>
-          <Input
+          <label htmlFor="state" className={labelClassName}>
+            State *
+          </label>
+          <input
+            type="text"
             id="state"
+            name="state"
             value={formData.state}
-            onChange={(e) => handleChange('state', e.target.value)}
-            className={errors.state ? 'border-red-500' : ''}
+            onChange={handleChange}
+            className={inputClassName(!!errors.state)}
             disabled={isLoading}
+            placeholder="Enter state"
           />
-          {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
+          {errors.state && <p className={errorClassName}>{errors.state}</p>}
         </div>
-        
+
         <div>
-          <Label htmlFor="postal_code">
-            {formData.country === 'IN' ? 'PIN Code *' : 'Postal Code *'}
-          </Label>
-          <Input
+          <label htmlFor="postal_code" className={labelClassName}>
+            Postal Code *
+          </label>
+          <input
+            type="text"
             id="postal_code"
+            name="postal_code"
             value={formData.postal_code}
-            onChange={(e) => handleChange('postal_code', e.target.value)}
-            className={errors.postal_code ? 'border-red-500' : ''}
+            onChange={handleChange}
+            className={inputClassName(!!errors.postal_code)}
             disabled={isLoading}
-            placeholder={formData.country === 'IN' ? '123456' : 'Postal code'}
+            placeholder="Enter postal code"
           />
-          {errors.postal_code && <p className="text-red-500 text-sm mt-1">{errors.postal_code}</p>}
+          {errors.postal_code && <p className={errorClassName}>{errors.postal_code}</p>}
         </div>
       </div>
 
-      {/* Country */}
-      <div>
-        <Label htmlFor="country">Country *</Label>
-        <Select 
-          value={formData.country} 
-          onValueChange={(value) => handleChange('country', value)}
-          disabled={isLoading}
-        >
-          <SelectTrigger className={errors.country ? 'border-red-500' : ''}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="IN">🇮🇳 India</SelectItem>
-            <SelectItem value="US">🇺🇸 United States</SelectItem>
-            <SelectItem value="GB">🇬🇧 United Kingdom</SelectItem>
-            <SelectItem value="CA">🇨🇦 Canada</SelectItem>
-            <SelectItem value="AU">🇦🇺 Australia</SelectItem>
-            <SelectItem value="DE">🇩🇪 Germany</SelectItem>
-            <SelectItem value="FR">🇫🇷 France</SelectItem>
-            <SelectItem value="SG">🇸🇬 Singapore</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.country && <p className="text-red-500 text-sm mt-1">{errors.country}</p>}
-      </div>
+      {/* Country and Phone */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="country" className={labelClassName}>
+            Country *
+          </label>
+          <select
+            id="country"
+            name="country"
+            value={formData.country}
+            onChange={handleChange}
+            className={inputClassName(!!errors.country)}
+            disabled={isLoading}
+          >
+            <option value="">Select a country</option>
+            <option value="India">India</option>
+            <option value="United States">United States</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="Canada">Canada</option>
+            <option value="Australia">Australia</option>
+            <option value="Germany">Germany</option>
+            <option value="France">France</option>
+            <option value="Japan">Japan</option>
+            <option value="Singapore">Singapore</option>
+            <option value="UAE">United Arab Emirates</option>
+          </select>
+          {errors.country && <p className={errorClassName}>{errors.country}</p>}
+        </div>
 
-      {/* Phone */}
-      <div>
-        <Label htmlFor="phone">Phone Number (Optional)</Label>
-        <Input
-          id="phone"
-          value={formData.phone}
-          onChange={(e) => handleChange('phone', e.target.value)}
-          className={errors.phone ? 'border-red-500' : ''}
-          disabled={isLoading}
-          placeholder="+91 98765 43210"
-        />
-        {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+        <div>
+          <label htmlFor="phone" className={labelClassName}>
+            Phone Number (Optional)
+          </label>
+          <input
+            type="tel"
+            id="phone"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            className={inputClassName(false)}
+            disabled={isLoading}
+            placeholder="Enter phone number"
+          />
+        </div>
       </div>
 
       {/* Form Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={onCancel}
+      <div className="flex justify-end space-x-3 pt-4">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          type="submit"
           disabled={isLoading}
-        >
-          Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={isLoading}
-          className="min-w-[120px]"
+          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? (
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span className="flex items-center">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
               Saving...
-            </div>
+            </span>
           ) : (
             submitLabel
           )}
-        </Button>
+        </button>
       </div>
     </form>
   );
