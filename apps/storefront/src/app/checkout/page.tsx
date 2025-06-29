@@ -11,39 +11,33 @@ import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { PaymentMethod } from "@/components/checkout/PaymentMethod";
 import { ShippingMethod } from "@/components/checkout/ShippingMethod";
 import { ordersService } from "@repo/api";
-import type { AddressForm as AddressFormType, UserAddress } from "@repo/types";
+import type {
+  AddressForm as AddressFormType,
+  UserAddress,
+  OrderCreateRequest,
+} from "@repo/types";
 
-// Define the correct API request type based on backend
-interface CreateOrderRequest {
-  shipping_address: {
-    first_name: string;
-    last_name: string;
-    company?: string;
-    address_line_1: string;
-    address_line_2?: string;
-    city: string;
-    state: string;
-    postal_code: string;
-    country: string;
-    phone?: string;
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  handler: (response: any) => void;
+  prefill: {
+    name: string;
+    email: string;
+    contact: string;
   };
-  billing_address?: {
-    first_name: string;
-    last_name: string;
-    company?: string;
-    address_line_1: string;
-    address_line_2?: string;
-    city: string;
-    state: string;
-    postal_code: string;
-    country: string;
-    phone?: string;
-  };
-  shipping_method: string;
-  payment_method: string;
-  notes?: string;
-  coupon_code?: string;
-  use_shipping_as_billing: boolean;
+  theme: { color: string };
+  modal: { ondismiss: () => void };
+}
+
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => { open: () => void };
+  }
 }
 
 export default function CheckoutPage() {
@@ -89,6 +83,20 @@ export default function CheckoutPage() {
       fetchAddresses();
     }
   }, [isAuthenticated, fetchCart, fetchAddresses]);
+
+  useEffect(() => {
+    // Load Razorpay script
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
 
   // Auto-select default shipping address
   useEffect(() => {
@@ -192,100 +200,186 @@ export default function CheckoutPage() {
 
   // Handle order placement with proper API integration
   const handlePlaceOrder = async () => {
-    if (!selectedShippingAddress || !cartData) {
-      setError("Please select a shipping address.");
-      return;
-    }
+    if (!selectedShippingAddress || !cartData) return;
 
-    const finalBillingAddress = useShippingAsBilling
-      ? selectedShippingAddress
-      : selectedBillingAddress;
-    if (!finalBillingAddress) {
-      setError("Please select a billing address.");
-      return;
-    }
+    // Capture values immediately to avoid scope issues
+    const userName =
+      `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
+    const userEmail = user?.email || "";
+    const userPhone = selectedShippingAddress?.phone || "";
 
     setIsPlacingOrder(true);
     setError("");
 
     try {
-      // Prepare order data in the correct format for the backend API
-      const orderData: CreateOrderRequest = {
+      const orderData: OrderCreateRequest = {
         shipping_address: convertAddressForAPI(selectedShippingAddress),
-        billing_address: convertAddressForAPI(finalBillingAddress),
+        billing_address: useShippingAsBilling
+          ? convertAddressForAPI(selectedShippingAddress)
+          : convertAddressForAPI(selectedBillingAddress!),
         shipping_method: shippingMethod,
         payment_method: paymentMethod,
         notes: notes.trim() || undefined,
-        coupon_code: couponCode.trim() || undefined,
         use_shipping_as_billing: useShippingAsBilling,
       };
 
-      console.log("🚀 Creating order with data:", orderData);
+      console.log("Creating order with data:", orderData);
 
-      // Call the backend API
-      const response = await ordersService.createOrder(orderData);
-      console.log("✅ Order creation response:", response);
+      // Step 1: Create order
+      const order = await ordersService.createOrder(orderData);
+      console.log("Order created:", order);
 
-      // Handle the response based on your backend API structure
-      let orderId;
-      if (response.data && response.data.id) {
-        orderId = response.data.id;
-      } else if (response.id) {
-        orderId = response.id;
-      } else {
-        throw new Error("Invalid order response: missing order ID");
-      }
-
-      console.log("✅ Order created successfully with ID:", orderId);
-
-      // Clear cart after successful order
-      try {
-        await clearCart();
-        console.log("✅ Cart cleared successfully");
-      } catch (cartError) {
-        console.warn(
-          "⚠️ Failed to clear cart, but order was created:",
-          cartError
-        );
-      }
-
-      // Redirect based on payment method
+      // Step 2: Handle payment based on method
       if (paymentMethod === "cod") {
-        // For COD, redirect to order confirmation
-        router.push(`/orders/${orderId}/confirmation`);
-      } else {
-        // For online payments, redirect to payment page
-        router.push(`/orders/${orderId}/payment`);
+        // For COD: Clear cart and redirect immediately
+        await clearCart();
+        router.push(`/orders/${order.id}/confirmation?payment=cod`);
+        return;
+      }
+
+      if (paymentMethod === "razorpay") {
+        console.log("Lllllllllll", localStorage.getItem("access_token"));
+        try {
+          // Step 3: Initiate Razorpay payment
+          const paymentResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/initiate`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ order_id: order.id }),
+            }
+          );
+
+          if (!paymentResponse.ok) {
+            const errorData = await paymentResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to initiate payment");
+          }
+
+          const paymentData = await paymentResponse.json();
+          console.log("Payment initiated:", paymentData);
+
+          // Check if Razorpay is loaded
+          if (!window.Razorpay) {
+            throw new Error(
+              "Razorpay is not loaded. Please refresh the page and try again."
+            );
+          }
+
+          // Step 4: Open Razorpay checkout
+          const razorpay = new window.Razorpay({
+            key: paymentData.data.key_id,
+            amount: paymentData.data.amount,
+            currency: paymentData.data.currency,
+            name: "Your Store",
+            description: `Order #${paymentData.data.receipt}`,
+            order_id: paymentData.data.razorpay_order_id,
+            handler: async (response: any) => {
+              try {
+                console.log("Payment completed:", response);
+
+                // Step 5: Verify payment
+                const verifyResponse = await fetch(
+                  `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/payment/verify`,
+                  {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      order_id: order.id,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_signature: response.razorpay_signature,
+                    }),
+                  }
+                );
+
+                if (!verifyResponse.ok) {
+                  const errorData = await verifyResponse
+                    .json()
+                    .catch(() => ({}));
+                  throw new Error(
+                    errorData.error || "Payment verification failed"
+                  );
+                }
+
+                console.log("Payment verified successfully");
+
+                // Step 6: Payment successful - clear cart and redirect
+                await clearCart();
+                router.push(`/orders/${order.id}/confirmation?payment=success`);
+              } catch (err: any) {
+                console.error("Payment verification failed:", err);
+                setError(
+                  "Payment verification failed. Please contact support."
+                );
+                setIsPlacingOrder(false);
+              }
+            },
+            prefill: {
+              name: userName,
+              email: userEmail,
+              contact: userPhone,
+            },
+            theme: {
+              color: "#3B82F6",
+            },
+            modal: {
+              ondismiss: () => {
+                console.log("Payment cancelled by user");
+                setError(
+                  "Payment was cancelled. Your order is created but payment is pending."
+                );
+                setIsPlacingOrder(false);
+              },
+            },
+          });
+
+          razorpay.open();
+        } catch (paymentError: any) {
+          console.error("Payment initiation failed:", paymentError);
+
+          // Log payment failure to backend
+          try {
+            console.log("Lllllllllll", localStorage.getItem("access_token"));
+            await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/failure`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  order_id: order.id,
+                  reason: paymentError.message || "Payment initiation failed",
+                  code: "PAYMENT_INITIATION_FAILED",
+                  source: "razorpay_frontend",
+                }),
+              }
+            );
+          } catch (failureError) {
+            console.error("Failed to log payment failure:", failureError);
+          }
+
+          setError(
+            `Payment failed: ${paymentError.message}. Please try again or contact support.`
+          );
+        }
       }
     } catch (err: any) {
-      console.error("❌ Failed to place order:", err);
-
-      // Handle different types of errors
-      let errorMessage = "Failed to place order. Please try again.";
-
-      if (err.response) {
-        // HTTP error response
-        const status = err.response.status;
-        const data = err.response.data;
-
-        console.error("❌ HTTP Error:", { status, data });
-
-        if (status === 400 && data.error) {
-          errorMessage = data.error;
-        } else if (status === 401) {
-          errorMessage = "Please login to continue.";
-        } else if (status === 422 && data.details) {
-          errorMessage = `Validation error: ${data.details}`;
-        } else if (data.message) {
-          errorMessage = data.message;
-        }
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
+      console.error("Failed to place order:", err);
+      setError(err.message || "Failed to place order. Please try again.");
     } finally {
-      setIsPlacingOrder(false);
+      // Only set loading to false here if we're not waiting for Razorpay
+      // For Razorpay, it's set to false in the handlers above
+      if (paymentMethod === "cod") {
+        setIsPlacingOrder(false);
+      }
     }
   };
 
@@ -306,7 +400,6 @@ export default function CheckoutPage() {
       </div>
     );
   }
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Checkout</h1>
