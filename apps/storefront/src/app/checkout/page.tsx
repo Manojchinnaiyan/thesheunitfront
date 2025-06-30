@@ -199,6 +199,8 @@ export default function CheckoutPage() {
   });
 
   // Handle order placement with proper API integration
+  // Improved checkout flow - replace your handlePlaceOrder function
+
   const handlePlaceOrder = async () => {
     if (!selectedShippingAddress || !cartData) return;
 
@@ -238,7 +240,6 @@ export default function CheckoutPage() {
       }
 
       if (paymentMethod === "razorpay") {
-        console.log("Lllllllllll", localStorage.getItem("access_token"));
         try {
           // Step 3: Initiate Razorpay payment
           const paymentResponse = await fetch(
@@ -282,7 +283,7 @@ export default function CheckoutPage() {
 
                 // Step 5: Verify payment
                 const verifyResponse = await fetch(
-                  `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/payment/verify`,
+                  `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/verify`,
                   {
                     method: "POST",
                     headers: {
@@ -315,7 +316,7 @@ export default function CheckoutPage() {
               } catch (err: any) {
                 console.error("Payment verification failed:", err);
                 setError(
-                  "Payment verification failed. Please contact support."
+                  "Payment verification failed. Please contact support if money was deducted."
                 );
                 setIsPlacingOrder(false);
               }
@@ -331,8 +332,12 @@ export default function CheckoutPage() {
             modal: {
               ondismiss: () => {
                 console.log("Payment cancelled by user");
+
+                // Handle payment cancellation/abandonment
+                handlePaymentCancellation(order.id);
+
                 setError(
-                  "Payment was cancelled. Your order is created but payment is pending."
+                  "Payment was cancelled. Your order has been created but payment is pending. You can retry payment from your orders page."
                 );
                 setIsPlacingOrder(false);
               },
@@ -344,30 +349,13 @@ export default function CheckoutPage() {
           console.error("Payment initiation failed:", paymentError);
 
           // Log payment failure to backend
-          try {
-            console.log("Lllllllllll", localStorage.getItem("access_token"));
-            await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/failure`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  order_id: order.id,
-                  reason: paymentError.message || "Payment initiation failed",
-                  code: "PAYMENT_INITIATION_FAILED",
-                  source: "razorpay_frontend",
-                }),
-              }
-            );
-          } catch (failureError) {
-            console.error("Failed to log payment failure:", failureError);
-          }
+          await handlePaymentFailure(
+            order.id,
+            paymentError.message || "Payment initiation failed"
+          );
 
           setError(
-            `Payment failed: ${paymentError.message}. Please try again or contact support.`
+            `Payment failed: ${paymentError.message}. Your order has been created. You can retry payment from your orders page.`
           );
         }
       }
@@ -376,10 +364,57 @@ export default function CheckoutPage() {
       setError(err.message || "Failed to place order. Please try again.");
     } finally {
       // Only set loading to false here if we're not waiting for Razorpay
-      // For Razorpay, it's set to false in the handlers above
       if (paymentMethod === "cod") {
         setIsPlacingOrder(false);
       }
+    }
+  };
+
+  // New function to handle payment cancellation
+  const handlePaymentCancellation = async (orderId: number) => {
+    try {
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/failure`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            reason: "Payment cancelled by user",
+            code: "USER_CANCELLED",
+            source: "razorpay_frontend",
+          }),
+        }
+      );
+    } catch (error) {
+      console.error("Failed to log payment cancellation:", error);
+    }
+  };
+
+  // New function to handle payment failures
+  const handlePaymentFailure = async (orderId: number, reason: string) => {
+    try {
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/failure`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            reason: reason,
+            code: "PAYMENT_FAILED",
+            source: "razorpay_frontend",
+          }),
+        }
+      );
+    } catch (error) {
+      console.error("Failed to log payment failure:", error);
     }
   };
 
