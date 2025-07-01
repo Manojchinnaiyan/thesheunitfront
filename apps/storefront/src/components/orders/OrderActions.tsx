@@ -17,6 +17,12 @@ export function OrderActions({
 }: OrderActionsProps) {
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
+  // ✅ FIXED: Check if order can actually be cancelled based on status
+  const isOrderCancellable = () => {
+    const cancellableStatuses = ['pending', 'confirmed', 'processing', 'payment_processing'];
+    return canCancel && cancellableStatuses.includes(order.status.toLowerCase());
+  };
+
   const handleDownloadInvoice = async () => {
     setDownloadingInvoice(true);
     try {
@@ -39,17 +45,14 @@ export function OrderActions({
         throw new Error(`Failed to load invoice: ${response.status} ${response.statusText}`);
       }
 
-      // Get the HTML content
       const htmlContent = await response.text();
 
-      // Create a new window with the invoice
       const newWindow = window.open("", "_blank", "width=800,height=600,scrollbars=yes,resizable=yes");
       if (newWindow) {
         newWindow.document.write(htmlContent);
         newWindow.document.close();
         newWindow.focus();
         
-        // Add print functionality after content loads
         setTimeout(() => {
           const printButton = newWindow.document.createElement('button');
           printButton.innerHTML = 'Print Invoice';
@@ -71,7 +74,6 @@ export function OrderActions({
           newWindow.document.body.appendChild(printButton);
         }, 500);
       } else {
-        // Fallback: Download as HTML file
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -119,8 +121,8 @@ export function OrderActions({
           {downloadingInvoice ? "Loading Invoice..." : "Download Invoice"}
         </button>
 
-        {/* Cancel Order */}
-        {canCancel && (
+        {/* Cancel Order - Only show if actually cancellable */}
+        {isOrderCancellable() && (
           <button
             onClick={onCancel}
             className="w-full flex items-center justify-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 transition-colors"
@@ -142,8 +144,20 @@ export function OrderActions({
           </button>
         )}
 
+        {/* Show cancellation info for cancelled orders */}
+        {order.status.toLowerCase() === 'cancelled' && (
+          <div className="w-full px-4 py-2 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+            <div className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              This order has been cancelled
+            </div>
+          </div>
+        )}
+
         {/* View Tracking */}
-        {order.tracking_number && (
+        {order.tracking_number && order.status.toLowerCase() !== 'cancelled' && (
           <Link
             href={`/orders/${order.id}/track`}
             className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"

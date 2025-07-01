@@ -31,13 +31,24 @@ export default function OrderDetailsPage() {
     }
   }, [orderId, fetchOrderById]);
 
+  // ✅ FIXED: Better cancellation logic
   const canCancelOrder = () => {
     if (!order) return false;
-    return ["pending", "confirmed", "processing"].includes(order.status.toLowerCase());
+    const cancellableStatuses = ['pending', 'confirmed', 'processing', 'payment_processing'];
+    return cancellableStatuses.includes(order.status.toLowerCase());
   };
 
   const handleCancelOrder = async () => {
-    if (!cancelReason.trim()) return;
+    if (!cancelReason.trim()) {
+      alert("Please provide a reason for cancellation.");
+      return;
+    }
+
+    // ✅ FIXED: Check if order can be cancelled before attempting
+    if (!canCancelOrder()) {
+      alert(`Cannot cancel order with status: ${order?.status}`);
+      return;
+    }
 
     setIsCancelling(true);
     try {
@@ -46,8 +57,9 @@ export default function OrderDetailsPage() {
       setCancelReason("");
       // Refresh order data
       await fetchOrderById(order!.id);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to cancel order:", error);
+      alert(`Failed to cancel order: ${error.message || 'Unknown error'}`);
     } finally {
       setIsCancelling(false);
     }
@@ -150,35 +162,44 @@ export default function OrderDetailsPage() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Order Items</h2>
             <div className="space-y-4">
-              {order.items?.map((item) => (
-                <div key={item.id} className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-gray-200 rounded-md flex-shrink-0">
-                    {item.product?.images?.[0] ? (
-                      <img
-                        src={item.product.images[0]}
-                        alt={item.product.name}
-                        className="w-full h-full object-cover rounded-md"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gray-300 rounded-md"></div>
-                    )}
+              {order.items && order.items.length > 0 ? (
+                order.items.map((item) => (
+                  <div key={item.id} className="flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-gray-200 rounded-md flex-shrink-0">
+                      {item.product?.image_url ? (
+                        <img
+                          src={item.product.image_url}
+                          alt={item.product.name}
+                          className="w-full h-full object-cover rounded-md"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-300 rounded-md flex items-center justify-center">
+                          <span className="text-gray-500 text-xs">No image</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900">
+                        {item.product?.name || item.name || 'Product'}
+                      </h3>
+                      <p className="text-gray-600">Quantity: {item.quantity}</p>
+                      {item.variant_title && (
+                        <p className="text-sm text-gray-500">{item.variant_title}</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-gray-900">
+                        {formatCurrency((item.total_amount || item.total_price) / 100)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {formatCurrency((item.unit_price || item.price) / 100)} each
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900">
-                      {item.product?.name || 'Product'}
-                    </h3>
-                    <p className="text-gray-600">Quantity: {item.quantity}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">
-                      {formatCurrency(item.total_amount / 100)}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {formatCurrency(item.unit_price / 100)} each
-                    </p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-gray-500">No items found for this order.</p>
+              )}
             </div>
           </div>
 
@@ -218,7 +239,7 @@ export default function OrderDetailsPage() {
                         {payment.payment_method.toUpperCase()}
                       </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        payment.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        payment.status === 'completed' || payment.status === 'paid' ? 'bg-green-100 text-green-800' :
                         payment.status === 'failed' ? 'bg-red-100 text-red-800' :
                         'bg-yellow-100 text-yellow-800'
                       }`}>
@@ -286,31 +307,60 @@ export default function OrderDetailsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Cancel Order</h3>
-            <p className="text-gray-600 mb-4">
-              Please provide a reason for canceling this order:
-            </p>
-            <textarea
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Reason for cancellation..."
-            />
-            <div className="mt-6 flex space-x-3">
-              <button
-                onClick={() => setShowCancelModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Keep Order
-              </button>
-              <button
-                onClick={handleCancelOrder}
-                disabled={!cancelReason.trim() || isCancelling}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-              >
-                {isCancelling ? "Canceling..." : "Cancel Order"}
-              </button>
+            
+            {/* Show current status warning */}
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-800">
+                <strong>Current Status:</strong> {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              </p>
+              {!canCancelOrder() && (
+                <p className="text-sm text-red-600 mt-1">
+                  This order cannot be cancelled in its current status.
+                </p>
+              )}
             </div>
+
+            {canCancelOrder() ? (
+              <>
+                <p className="text-gray-600 mb-4">
+                  Please provide a reason for canceling this order:
+                </p>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Reason for cancellation..."
+                />
+                <div className="mt-6 flex space-x-3">
+                  <button
+                    onClick={() => setShowCancelModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Keep Order
+                  </button>
+                  <button
+                    onClick={handleCancelOrder}
+                    disabled={!cancelReason.trim() || isCancelling}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isCancelling ? "Canceling..." : "Cancel Order"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center">
+                <p className="text-gray-600 mb-4">
+                  This order cannot be cancelled because it's already in "{order.status}" status.
+                </p>
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                >
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
