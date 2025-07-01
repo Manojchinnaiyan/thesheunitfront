@@ -37,14 +37,14 @@ export const convertAddressForAPI = (address: AddressFormType, type: 'shipping' 
     first_name: address.first_name,
     last_name: address.last_name,
     company: address.company || '',
-    address_line1: address.address_line_1, // Note: backend expects address_line1, not address_line_1
+    address_line1: address.address_line_1, // Corrected field mapping
     address_line2: address.address_line_2 || '',
     city: address.city,
     state: address.state,
     postal_code: address.postal_code,
     country: address.country.length === 2 ? address.country : (COUNTRY_CODE_MAP[address.country] || address.country),
     phone: address.phone || '',
-    is_default: false, // Let backend handle default logic
+    is_default: false,
   };
 };
 

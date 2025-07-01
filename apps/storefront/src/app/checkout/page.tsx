@@ -2,419 +2,92 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useAuthStore } from "@/store/auth";
 import { useCartStore } from "@/store/cart";
 import { useAddressStore } from "@/store/address";
 import { AddressForm } from "@/components/checkout/AddressForm";
-import { OrderSummary } from "@/components/checkout/OrderSummary";
-import { PaymentMethod } from "@/components/checkout/PaymentMethod";
-import { ShippingMethod } from "@/components/checkout/ShippingMethod";
-import { ordersService } from "@repo/api";
-import type {
-  AddressForm as AddressFormType,
-  UserAddress,
-  OrderCreateRequest,
-} from "@repo/types";
-
-interface RazorpayOptions {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  handler: (response: any) => void;
-  prefill: {
-    name: string;
-    email: string;
-    contact: string;
-  };
-  theme: { color: string };
-  modal: { ondismiss: () => void };
-}
-
-declare global {
-  interface Window {
-    Razorpay: new (options: RazorpayOptions) => { open: () => void };
-  }
-}
+import { formatCurrency } from "@/lib/utils";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
-  const {
-    cartData,
-    isLoading: cartLoading,
-    fetchCart,
-    clearCart,
-  } = useCartStore();
-  const {
-    addresses,
-    isLoading: addressLoading,
-    fetchAddresses,
-    createAddress,
+  const { items, total, isLoading: cartLoading, fetchCart } = useCartStore();
+  const { 
+    addresses, 
+    isLoading: addressLoading, 
+    fetchAddresses, 
+    createAddress 
   } = useAddressStore();
 
-  // Checkout state
   const [currentStep, setCurrentStep] = useState(1);
+  const [shippingAddress, setShippingAddress] = useState(null);
+  const [billingAddress, setBillingAddress] = useState(null);
+  const [useSameAddress, setUseSameAddress] = useState(true);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("razorpay");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [error, setError] = useState("");
 
-  // Address management
-  const [selectedShippingAddress, setSelectedShippingAddress] =
-    useState<UserAddress | null>(null);
-  const [selectedBillingAddress, setSelectedBillingAddress] =
-    useState<UserAddress | null>(null);
-  const [useShippingAsBilling, setUseShippingAsBilling] = useState(true);
-  const [showNewShippingForm, setShowNewShippingForm] = useState(false);
-  const [showNewBillingForm, setShowNewBillingForm] = useState(false);
-
-  // Other form data
-  const [shippingMethod, setShippingMethod] = useState("standard");
-  const [shippingCost, setShippingCost] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState("razorpay");
-  const [notes, setNotes] = useState("");
-  const [couponCode, setCouponCode] = useState("");
-
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchCart();
-      fetchAddresses();
-    }
-  }, [isAuthenticated, fetchCart, fetchAddresses]);
+    fetchCart();
+    fetchAddresses();
+  }, [fetchCart, fetchAddresses]);
 
-  useEffect(() => {
-    // Load Razorpay script
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
-
-  // Auto-select default shipping address
-  useEffect(() => {
-    if (addresses.length > 0 && !selectedShippingAddress) {
-      const defaultAddress =
-        addresses.find((addr) => addr.is_default) || addresses[0];
-      setSelectedShippingAddress(defaultAddress);
-      if (useShippingAsBilling) {
-        setSelectedBillingAddress(defaultAddress);
-      }
-    }
-  }, [addresses, selectedShippingAddress, useShippingAsBilling]);
-
-  // Redirect if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Checkout</h1>
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded">
-            <p>Please sign in to continue with checkout.</p>
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 hover:text-blue-500 ml-1"
-            >
-              Sign in here
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if cart is empty
-  if (
-    !cartLoading &&
-    (!cartData || !cartData.items || cartData.items.length === 0)
-  ) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Checkout</h1>
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded">
-            <p>Your cart is empty. Add some products before checking out.</p>
-            <Link
-              href="/products"
-              className="font-medium text-blue-600 hover:text-blue-500 ml-1"
-            >
-              Continue shopping
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Handle new shipping address
-  const handleNewShippingAddress = async (addressData: AddressFormType) => {
+  const handleAddressSubmit = async (addressData: any) => {
     try {
-      console.log("Creating new shipping address:", addressData);
-      const newAddress = await createAddress(addressData);
-      console.log("New shipping address created:", newAddress);
-      setSelectedShippingAddress(newAddress);
-      setShowNewShippingForm(false);
-      if (useShippingAsBilling) {
-        setSelectedBillingAddress(newAddress);
+      if (currentStep === 1) {
+        // Shipping address
+        const address = await createAddress(addressData);
+        setShippingAddress(address);
+        setCurrentStep(2);
+      } else if (currentStep === 2) {
+        // Billing address
+        const address = await createAddress(addressData);
+        setBillingAddress(address);
+        setCurrentStep(3);
       }
     } catch (error) {
-      console.error("Failed to create shipping address:", error);
-      setError("Failed to save shipping address. Please try again.");
+      console.error("Error saving address:", error);
+      setError("Failed to save address. Please try again.");
     }
   };
-
-  // Handle new billing address
-  const handleNewBillingAddress = async (addressData: AddressFormType) => {
-    try {
-      console.log("Creating new billing address:", addressData);
-      const newAddress = await createAddress(addressData);
-      console.log("New billing address created:", newAddress);
-      setSelectedBillingAddress(newAddress);
-      setShowNewBillingForm(false);
-    } catch (error) {
-      console.error("Failed to create billing address:", error);
-      setError("Failed to save billing address. Please try again.");
-    }
-  };
-
-  // Convert UserAddress to API address format
-  const convertAddressForAPI = (address: UserAddress) => ({
-    first_name: address.first_name,
-    last_name: address.last_name,
-    company: address.company || undefined,
-    address_line_1: address.address_line_1,
-    address_line_2: address.address_line_2 || undefined,
-    city: address.city,
-    state: address.state,
-    postal_code: address.postal_code,
-    country: address.country,
-    phone: address.phone || undefined,
-  });
-
-  // Handle order placement with proper API integration
-  // Improved checkout flow - replace your handlePlaceOrder function
 
   const handlePlaceOrder = async () => {
-    if (!selectedShippingAddress || !cartData) return;
-
-    // Capture values immediately to avoid scope issues
-    const userName =
-      `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
-    const userEmail = user?.email || "";
-    const userPhone = selectedShippingAddress?.phone || "";
-
     setIsPlacingOrder(true);
     setError("");
 
     try {
-      const orderData: OrderCreateRequest = {
-        shipping_address: convertAddressForAPI(selectedShippingAddress),
-        billing_address: useShippingAsBilling
-          ? convertAddressForAPI(selectedShippingAddress)
-          : convertAddressForAPI(selectedBillingAddress!),
-        shipping_method: shippingMethod,
-        payment_method: paymentMethod,
-        notes: notes.trim() || undefined,
-        use_shipping_as_billing: useShippingAsBilling,
+      const orderData = {
+        shipping_address: shippingAddress,
+        billing_address: useSameAddress ? shippingAddress : billingAddress,
+        shipping_method: selectedShippingMethod,
+        payment_method: selectedPaymentMethod,
       };
 
-      console.log("Creating order with data:", orderData);
+      const token = localStorage.getItem("access_token");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
+      
+      const response = await fetch(`${apiUrl}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(orderData),
+      });
 
-      // Step 1: Create order
-      const order = await ordersService.createOrder(orderData);
-      console.log("Order created:", order);
-
-      // Step 2: Handle payment based on method
-      if (paymentMethod === "cod") {
-        // For COD: Clear cart and redirect immediately
-        await clearCart();
-        router.push(`/orders/${order.id}/confirmation?payment=cod`);
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to place order");
       }
 
-      if (paymentMethod === "razorpay") {
-        try {
-          // Step 3: Initiate Razorpay payment
-          const paymentResponse = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/initiate`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ order_id: order.id }),
-            }
-          );
-
-          if (!paymentResponse.ok) {
-            const errorData = await paymentResponse.json().catch(() => ({}));
-            throw new Error(errorData.error || "Failed to initiate payment");
-          }
-
-          const paymentData = await paymentResponse.json();
-          console.log("Payment initiated:", paymentData);
-
-          // Check if Razorpay is loaded
-          if (!window.Razorpay) {
-            throw new Error(
-              "Razorpay is not loaded. Please refresh the page and try again."
-            );
-          }
-
-          // Step 4: Open Razorpay checkout
-          const razorpay = new window.Razorpay({
-            key: paymentData.data.key_id,
-            amount: paymentData.data.amount,
-            currency: paymentData.data.currency,
-            name: "Your Store",
-            description: `Order #${paymentData.data.receipt}`,
-            order_id: paymentData.data.razorpay_order_id,
-            handler: async (response: any) => {
-              try {
-                console.log("Payment completed:", response);
-
-                // Step 5: Verify payment
-                const verifyResponse = await fetch(
-                  `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/verify`,
-                  {
-                    method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      order_id: order.id,
-                      razorpay_order_id: response.razorpay_order_id,
-                      razorpay_payment_id: response.razorpay_payment_id,
-                      razorpay_signature: response.razorpay_signature,
-                    }),
-                  }
-                );
-
-                if (!verifyResponse.ok) {
-                  const errorData = await verifyResponse
-                    .json()
-                    .catch(() => ({}));
-                  throw new Error(
-                    errorData.error || "Payment verification failed"
-                  );
-                }
-
-                console.log("Payment verified successfully");
-
-                // Step 6: Payment successful - clear cart and redirect
-                await clearCart();
-                router.push(`/orders/${order.id}/confirmation?payment=success`);
-              } catch (err: any) {
-                console.error("Payment verification failed:", err);
-                setError(
-                  "Payment verification failed. Please contact support if money was deducted."
-                );
-                setIsPlacingOrder(false);
-              }
-            },
-            prefill: {
-              name: userName,
-              email: userEmail,
-              contact: userPhone,
-            },
-            theme: {
-              color: "#3B82F6",
-            },
-            modal: {
-              ondismiss: () => {
-                console.log("Payment cancelled by user");
-
-                // Handle payment cancellation/abandonment
-                handlePaymentCancellation(order.id);
-
-                setError(
-                  "Payment was cancelled. Your order has been created but payment is pending. You can retry payment from your orders page."
-                );
-                setIsPlacingOrder(false);
-              },
-            },
-          });
-
-          razorpay.open();
-        } catch (paymentError: any) {
-          console.error("Payment initiation failed:", paymentError);
-
-          // Log payment failure to backend
-          await handlePaymentFailure(
-            order.id,
-            paymentError.message || "Payment initiation failed"
-          );
-
-          setError(
-            `Payment failed: ${paymentError.message}. Your order has been created. You can retry payment from your orders page.`
-          );
-        }
-      }
+      const order = await response.json();
+      
+      // Redirect to success page
+      router.push(`/orders/${order.id}?success=true`);
     } catch (err: any) {
-      console.error("Failed to place order:", err);
+      console.error("Order placement error:", err);
       setError(err.message || "Failed to place order. Please try again.");
     } finally {
-      // Only set loading to false here if we're not waiting for Razorpay
-      if (paymentMethod === "cod") {
-        setIsPlacingOrder(false);
-      }
-    }
-  };
-
-  // New function to handle payment cancellation
-  const handlePaymentCancellation = async (orderId: number) => {
-    try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/failure`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            order_id: orderId,
-            reason: "Payment cancelled by user",
-            code: "USER_CANCELLED",
-            source: "razorpay_frontend",
-          }),
-        }
-      );
-    } catch (error) {
-      console.error("Failed to log payment cancellation:", error);
-    }
-  };
-
-  // New function to handle payment failures
-  const handlePaymentFailure = async (orderId: number, reason: string) => {
-    try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/payment/failure`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            order_id: orderId,
-            reason: reason,
-            code: "PAYMENT_FAILED",
-            source: "razorpay_frontend",
-          }),
-        }
-      );
-    } catch (error) {
-      console.error("Failed to log payment failure:", error);
+      setIsPlacingOrder(false);
     }
   };
 
@@ -435,6 +108,7 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Checkout</h1>
@@ -486,598 +160,216 @@ export default function CheckoutPage() {
                   </div>
                   {stepIdx < steps.length - 1 && (
                     <div
-                      className={`flex-1 ml-4 h-0.5 ${
-                        currentStep > step.id ? "bg-blue-600" : "bg-gray-200"
+                      className={`hidden lg:block w-5 h-5 ml-4 ${
+                        currentStep > step.id
+                          ? "text-blue-600"
+                          : "text-gray-300"
                       }`}
-                    />
+                    >
+                      →
+                    </div>
                   )}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Step 1: Shipping Address */}
+          {/* Step Content */}
           {currentStep === 1 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-medium text-gray-900">
-                  Shipping Address
-                </h2>
-                <button
-                  onClick={() => setShowNewShippingForm(!showNewShippingForm)}
-                  className="text-sm text-blue-600 hover:text-blue-500"
-                >
-                  {showNewShippingForm ? "Cancel" : "+ Add New Address"}
-                </button>
-              </div>
-
-              {/* New Address Form */}
-              {showNewShippingForm && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                  <h3 className="text-md font-medium text-gray-900 mb-4">
-                    Add New Shipping Address
-                  </h3>
-                  <AddressForm
-                    onSubmit={handleNewShippingAddress}
-                    onCancel={() => setShowNewShippingForm(false)}
-                    submitLabel="Save & Use This Address"
-                    isLoading={addressLoading}
-                  />
-                </div>
-              )}
-
-              {/* Existing Addresses */}
-              {addresses.length > 0 && (
-                <div className="space-y-4 mb-6">
-                  <h3 className="text-md font-medium text-gray-900">
-                    Select from saved addresses:
-                  </h3>
-                  {addresses.map((address) => (
-                    <div
-                      key={address.id}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedShippingAddress?.id === address.id
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                      onClick={() => {
-                        setSelectedShippingAddress(address);
-                        if (useShippingAsBilling) {
-                          setSelectedBillingAddress(address);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center mb-2">
-                        <input
-                          type="radio"
-                          checked={selectedShippingAddress?.id === address.id}
-                          onChange={() => {}}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <span className="ml-3 text-sm font-medium text-gray-900">
-                          {address.first_name} {address.last_name}
-                          {address.is_default && (
-                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Default
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <div className="ml-7 space-y-1 text-sm text-gray-600">
-                        {address.company && <p>{address.company}</p>}
-                        <p>{address.address_line_1}</p>
-                        {address.address_line_2 && (
-                          <p>{address.address_line_2}</p>
-                        )}
-                        <p>
-                          {address.city}, {address.state} {address.postal_code}
-                        </p>
-                        <p>{address.country}</p>
-                        {address.phone && <p>Phone: {address.phone}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {addresses.length === 0 && !showNewShippingForm && (
-                <div className="text-center py-6">
-                  <p className="text-gray-500 mb-4">
-                    No saved addresses found.
-                  </p>
-                  <button
-                    onClick={() => setShowNewShippingForm(true)}
-                    className="btn-primary px-4 py-2"
-                  >
-                    Add Shipping Address
-                  </button>
-                </div>
-              )}
-
-              {selectedShippingAddress && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setCurrentStep(2)}
-                    className="btn-primary px-6 py-2"
-                  >
-                    Continue to Billing
-                  </button>
-                </div>
-              )}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">
+                Shipping Address
+              </h2>
+              <AddressForm
+                onSubmit={handleAddressSubmit}
+                addressType="shipping"
+                isLoading={false}
+              />
             </div>
           )}
 
-          {/* Step 2: Billing Address */}
-          {currentStep === 2 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-6">
+          {currentStep === 2 && !useSameAddress && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">
                 Billing Address
               </h2>
-
-              {/* Use shipping as billing option */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
-                    checked={useShippingAsBilling}
+                    checked={useSameAddress}
                     onChange={(e) => {
-                      setUseShippingAsBilling(e.target.checked);
+                      setUseSameAddress(e.target.checked);
                       if (e.target.checked) {
-                        setSelectedBillingAddress(selectedShippingAddress);
-                        setShowNewBillingForm(false);
+                        setBillingAddress(shippingAddress);
+                        setCurrentStep(3);
                       }
                     }}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                   />
-                  <span className="ml-2 text-sm text-gray-900">
-                    Use shipping address as billing address
+                  <span className="ml-2 text-sm text-gray-600">
+                    Use same as shipping address
                   </span>
                 </label>
               </div>
-
-              {!useShippingAsBilling && (
-                <>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-md font-medium text-gray-900">
-                      Select Billing Address
-                    </h3>
-                    <button
-                      onClick={() => setShowNewBillingForm(!showNewBillingForm)}
-                      className="text-sm text-blue-600 hover:text-blue-500"
-                    >
-                      {showNewBillingForm ? "Cancel" : "+ Add New Address"}
-                    </button>
-                  </div>
-
-                  {/* New Billing Address Form */}
-                  {showNewBillingForm && (
-                    <div className="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                      <h3 className="text-md font-medium text-gray-900 mb-4">
-                        Add New Billing Address
-                      </h3>
-                      <AddressForm
-                        onSubmit={handleNewBillingAddress}
-                        onCancel={() => setShowNewBillingForm(false)}
-                        submitLabel="Save & Use This Address"
-                        isLoading={addressLoading}
-                      />
-                    </div>
-                  )}
-
-                  {/* Existing Addresses for Billing */}
-                  {addresses.length > 0 && !showNewBillingForm && (
-                    <div className="space-y-4 mb-6">
-                      {addresses.map((address) => (
-                        <div
-                          key={address.id}
-                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                            selectedBillingAddress?.id === address.id
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
-                          onClick={() => setSelectedBillingAddress(address)}
-                        >
-                          <div className="flex items-center mb-2">
-                            <input
-                              type="radio"
-                              checked={
-                                selectedBillingAddress?.id === address.id
-                              }
-                              onChange={() => {}}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                            />
-                            <span className="ml-3 text-sm font-medium text-gray-900">
-                              {address.first_name} {address.last_name}
-                              {address.is_default && (
-                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  Default
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                          <div className="ml-7 space-y-1 text-sm text-gray-600">
-                            {address.company && <p>{address.company}</p>}
-                            <p>{address.address_line_1}</p>
-                            {address.address_line_2 && (
-                              <p>{address.address_line_2}</p>
-                            )}
-                            <p>
-                              {address.city}, {address.state}{" "}
-                              {address.postal_code}
-                            </p>
-                            <p>{address.country}</p>
-                            {address.phone && <p>Phone: {address.phone}</p>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
+              {!useSameAddress && (
+                <AddressForm
+                  onSubmit={handleAddressSubmit}
+                  addressType="billing"
+                  isLoading={false}
+                />
               )}
-
-              <div className="flex justify-between">
-                <button
-                  onClick={() => setCurrentStep(1)}
-                  className="btn-outline px-6 py-2"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => setCurrentStep(3)}
-                  className="btn-primary px-6 py-2"
-                  disabled={!useShippingAsBilling && !selectedBillingAddress}
-                >
-                  Continue to Shipping
-                </button>
-              </div>
             </div>
           )}
 
-          {/* Step 3: Shipping & Payment */}
           {currentStep === 3 && (
             <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <ShippingMethod
-                  selectedMethod={shippingMethod}
-                  onMethodChange={setShippingMethod}
-                  onCostChange={setShippingCost}
-                />
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <PaymentMethod
-                  selectedMethod={paymentMethod}
-                  onMethodChange={setPaymentMethod}
-                />
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Order Notes (Optional)
-                </h3>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Special instructions for your order..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              {/* Coupon Code Section */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Coupon Code (Optional)
-                </h3>
-                <div className="flex space-x-3">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="Enter coupon code"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <button className="btn-outline px-4 py-2">Apply</button>
+              {/* Shipping Methods */}
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">
+                  Shipping Method
+                </h2>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="shipping"
+                      value="standard"
+                      checked={selectedShippingMethod === "standard"}
+                      onChange={(e) => setSelectedShippingMethod(e.target.value)}
+                      className="form-radio text-blue-600"
+                    />
+                    <span className="ml-2">Standard Shipping (5-7 days) - Free</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="shipping"
+                      value="express"
+                      checked={selectedShippingMethod === "express"}
+                      onChange={(e) => setSelectedShippingMethod(e.target.value)}
+                      className="form-radio text-blue-600"
+                    />
+                    <span className="ml-2">Express Shipping (2-3 days) - $10.00</span>
+                  </label>
                 </div>
               </div>
 
-              <div className="flex justify-between">
-                <button
-                  onClick={() => setCurrentStep(2)}
-                  className="btn-outline px-6 py-2"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => setCurrentStep(4)}
-                  className="btn-primary px-6 py-2"
-                >
-                  Review Order
-                </button>
+              {/* Payment Methods */}
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">
+                  Payment Method
+                </h2>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="razorpay"
+                      checked={selectedPaymentMethod === "razorpay"}
+                      onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                      className="form-radio text-blue-600"
+                    />
+                    <span className="ml-2">Razorpay (Cards, UPI, Wallets)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="cod"
+                      checked={selectedPaymentMethod === "cod"}
+                      onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                      className="form-radio text-blue-600"
+                    />
+                    <span className="ml-2">Cash on Delivery</span>
+                  </label>
+                </div>
               </div>
+
+              <button
+                onClick={() => setCurrentStep(4)}
+                disabled={!selectedShippingMethod || !selectedPaymentMethod}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                Continue to Review
+              </button>
             </div>
           )}
 
-          {/* Step 4: Review Order */}
           {currentStep === 4 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-6">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">
                 Review Your Order
               </h2>
-
-              {/* Address Summary */}
-              <div className="mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Shipping Address */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Shipping Address
-                    </h3>
-                    {selectedShippingAddress && (
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <p className="font-medium text-gray-900">
-                          {selectedShippingAddress.first_name}{" "}
-                          {selectedShippingAddress.last_name}
-                        </p>
-                        {selectedShippingAddress.company && (
-                          <p>{selectedShippingAddress.company}</p>
-                        )}
-                        <p>{selectedShippingAddress.address_line_1}</p>
-                        {selectedShippingAddress.address_line_2 && (
-                          <p>{selectedShippingAddress.address_line_2}</p>
-                        )}
-                        <p>
-                          {selectedShippingAddress.city},{" "}
-                          {selectedShippingAddress.state}{" "}
-                          {selectedShippingAddress.postal_code}
-                        </p>
-                        <p>{selectedShippingAddress.country}</p>
-                        {selectedShippingAddress.phone && (
-                          <p>Phone: {selectedShippingAddress.phone}</p>
-                        )}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => setCurrentStep(1)}
-                      className="mt-2 text-sm text-blue-600 hover:text-blue-500"
-                    >
-                      Edit
-                    </button>
-                  </div>
-
-                  {/* Billing Address */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Billing Address
-                    </h3>
-                    {(useShippingAsBilling
-                      ? selectedShippingAddress
-                      : selectedBillingAddress) && (
-                      <div className="text-sm text-gray-600 space-y-1">
-                        {useShippingAsBilling && (
-                          <p className="text-xs text-blue-600 mb-2">
-                            Same as shipping address
-                          </p>
-                        )}
-                        <p className="font-medium text-gray-900">
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.first_name
-                          }{" "}
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.last_name
-                          }
-                        </p>
-                        {(useShippingAsBilling
-                          ? selectedShippingAddress
-                          : selectedBillingAddress
-                        )?.company && (
-                          <p>
-                            {
-                              (useShippingAsBilling
-                                ? selectedShippingAddress
-                                : selectedBillingAddress
-                              )?.company
-                            }
-                          </p>
-                        )}
-                        <p>
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.address_line_1
-                          }
-                        </p>
-                        {(useShippingAsBilling
-                          ? selectedShippingAddress
-                          : selectedBillingAddress
-                        )?.address_line_2 && (
-                          <p>
-                            {
-                              (useShippingAsBilling
-                                ? selectedShippingAddress
-                                : selectedBillingAddress
-                              )?.address_line_2
-                            }
-                          </p>
-                        )}
-                        <p>
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.city
-                          }
-                          ,{" "}
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.state
-                          }{" "}
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.postal_code
-                          }
-                        </p>
-                        <p>
-                          {
-                            (useShippingAsBilling
-                              ? selectedShippingAddress
-                              : selectedBillingAddress
-                            )?.country
-                          }
-                        </p>
-                        {(useShippingAsBilling
-                          ? selectedShippingAddress
-                          : selectedBillingAddress
-                        )?.phone && (
-                          <p>
-                            Phone:{" "}
-                            {
-                              (useShippingAsBilling
-                                ? selectedShippingAddress
-                                : selectedBillingAddress
-                              )?.phone
-                            }
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => setCurrentStep(2)}
-                      className="mt-2 text-sm text-blue-600 hover:text-blue-500"
-                    >
-                      Edit
-                    </button>
-                  </div>
+              
+              {/* Order Summary */}
+              <div className="space-y-4 mb-6">
+                <div>
+                  <h3 className="font-medium">Shipping Address</h3>
+                  <p className="text-sm text-gray-600">
+                    {shippingAddress?.first_name} {shippingAddress?.last_name}<br />
+                    {shippingAddress?.address_line1}<br />
+                    {shippingAddress?.city}, {shippingAddress?.state} {shippingAddress?.postal_code}
+                  </p>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium">Payment Method</h3>
+                  <p className="text-sm text-gray-600">
+                    {selectedPaymentMethod === "razorpay" ? "Razorpay" : "Cash on Delivery"}
+                  </p>
                 </div>
               </div>
 
-              {/* Shipping and Payment Summary */}
-              <div className="border-t border-gray-200 pt-6 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Shipping Method
-                    </h3>
-                    <p className="text-sm text-gray-600 capitalize">
-                      {shippingMethod.replace("_", " ")}
-                    </p>
-                    <button
-                      onClick={() => setCurrentStep(3)}
-                      className="mt-2 text-sm text-blue-600 hover:text-blue-500"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
-                      Payment Method
-                    </h3>
-                    <p className="text-sm text-gray-600 capitalize">
-                      {paymentMethod}
-                    </p>
-                    <button
-                      onClick={() => setCurrentStep(3)}
-                      className="mt-2 text-sm text-blue-600 hover:text-blue-500"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Order Notes */}
-              {notes && (
-                <div className="border-t border-gray-200 pt-6 mb-6">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">
-                    Order Notes
-                  </h3>
-                  <p className="text-sm text-gray-600">{notes}</p>
-                  <button
-                    onClick={() => setCurrentStep(3)}
-                    className="mt-2 text-sm text-blue-600 hover:text-blue-500"
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
-
-              {/* Coupon Code */}
-              {couponCode && (
-                <div className="border-t border-gray-200 pt-6 mb-6">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">
-                    Coupon Code
-                  </h3>
-                  <p className="text-sm text-green-600">{couponCode}</p>
-                  <button
-                    onClick={() => setCurrentStep(3)}
-                    className="mt-2 text-sm text-blue-600 hover:text-blue-500"
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
-
-              <div className="flex justify-between border-t border-gray-200 pt-6">
-                <button
-                  onClick={() => setCurrentStep(3)}
-                  className="btn-outline px-6 py-2"
-                  disabled={isPlacingOrder}
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handlePlaceOrder}
-                  disabled={isPlacingOrder}
-                  className="btn-primary px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPlacingOrder ? (
-                    <span className="flex items-center">
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Placing Order...
-                    </span>
-                  ) : (
-                    "Place Order"
-                  )}
-                </button>
-              </div>
+              <button
+                onClick={handlePlaceOrder}
+                disabled={isPlacingOrder}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50"
+              >
+                {isPlacingOrder ? "Placing Order..." : "Place Order"}
+              </button>
             </div>
           )}
         </div>
 
         {/* Order Summary Sidebar */}
         <div className="mt-10 lg:mt-0 lg:col-span-5">
-          <div className="bg-white rounded-lg shadow p-6 sticky top-4">
-            <OrderSummary cartData={cartData} shippingCost={shippingCost} />
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h2>
+            
+            <div className="space-y-4">
+              {items.map((item) => (
+                <div key={item.id} className="flex space-x-4">
+                  <div className="w-16 h-16 bg-gray-200 rounded-md"></div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium">{item.product?.name}</h3>
+                    <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                  </div>
+                  <div className="text-sm font-medium">
+                    {formatCurrency((item.product?.price || 0) * item.quantity / 100)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t pt-4 mt-4 space-y-2">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatCurrency(total / 100)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span>{selectedShippingMethod === "express" ? "$10.00" : "Free"}</span>
+              </div>
+              <div className="border-t pt-2">
+                <div className="flex justify-between font-medium">
+                  <span>Total</span>
+                  <span>
+                    {formatCurrency((total + (selectedShippingMethod === "express" ? 1000 : 0)) / 100)}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

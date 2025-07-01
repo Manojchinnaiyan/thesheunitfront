@@ -1,65 +1,7 @@
-// store/order.ts
+// store/order.ts - FIXED VERSION
 import { create } from "zustand";
 import { API_CONFIG, API_ENDPOINTS } from "@repo/config";
-
-interface Order {
-  id: number;
-  user_id: number;
-  order_number: string;
-  email: string;
-  status: string;
-  payment_status: string;
-  subtotal_amount: number;
-  tax_amount: number;
-  shipping_amount: number;
-  discount_amount: number;
-  total_amount: number;
-  currency: string;
-  notes?: string;
-  coupon_code?: string;
-  shipping_method?: string;
-  shipping_address: any;
-  billing_address: any;
-  tracking_number?: string;
-  shipping_carrier?: string;
-  shipped_at?: string;
-  delivered_at?: string;
-  created_at: string;
-  updated_at: string;
-  items: OrderItem[];
-  status_history: OrderStatusHistory[];
-}
-
-interface OrderItem {
-  id: number;
-  order_id: number;
-  product_id: number;
-  product_variant_id?: number;
-  sku: string;
-  name: string;
-  variant_title?: string;
-  quantity: number;
-  price: number;
-  total_price: number;
-}
-
-interface OrderStatusHistory {
-  id: number;
-  order_id: number;
-  status: string;
-  comment: string;
-  created_by: number;
-  created_at: string;
-}
-
-interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  total_pages: number;
-  has_next: boolean;
-  has_prev: boolean;
-}
+import type { Order, OrderItem, OrderStatusHistory, Pagination } from "@repo/types";
 
 interface OrderResponse {
   orders: Order[];
@@ -76,6 +18,7 @@ interface OrderStore {
   // Actions
   fetchOrders: (page?: number, limit?: number) => Promise<void>;
   fetchOrder: (orderId: number) => Promise<Order | null>;
+  fetchOrderById: (orderId: number) => Promise<void>; // ✅ ADDED MISSING METHOD
   fetchOrderByNumber: (orderNumber: string) => Promise<Order | null>;
   cancelOrder: (orderId: number, reason: string) => Promise<void>;
   clearError: () => void;
@@ -123,9 +66,10 @@ const useOrderStore = create<OrderStore>((set, get) => ({
       });
     } catch (error) {
       set({
-        error:
-          error instanceof Error ? error.message : "Failed to fetch orders",
+        error: error instanceof Error ? error.message : "Failed to fetch orders",
         isLoading: false,
+        orders: [],
+        pagination: null,
       });
     }
   },
@@ -167,9 +111,15 @@ const useOrderStore = create<OrderStore>((set, get) => ({
       set({
         error: error instanceof Error ? error.message : "Failed to fetch order",
         isLoading: false,
+        currentOrder: null,
       });
       return null;
     }
+  },
+
+  // ✅ ADDED MISSING METHOD
+  fetchOrderById: async (orderId: number) => {
+    await get().fetchOrder(orderId);
   },
 
   fetchOrderByNumber: async (orderNumber: string) => {
@@ -209,6 +159,7 @@ const useOrderStore = create<OrderStore>((set, get) => ({
       set({
         error: error instanceof Error ? error.message : "Failed to fetch order",
         isLoading: false,
+        currentOrder: null,
       });
       return null;
     }
@@ -246,8 +197,7 @@ const useOrderStore = create<OrderStore>((set, get) => ({
       set({ isLoading: false });
     } catch (error) {
       set({
-        error:
-          error instanceof Error ? error.message : "Failed to cancel order",
+        error: error instanceof Error ? error.message : "Failed to cancel order",
         isLoading: false,
       });
     }
