@@ -1,4 +1,3 @@
-import { paymentService, PaymentService } from "./payment";
 // Export API client
 export { apiClient } from "./client";
 
@@ -7,15 +6,17 @@ export { authService, AuthService } from "./auth";
 export { productsService, ProductsService } from "./products";
 export { cartService, CartService } from "./cart";
 export { ordersService, OrdersService } from "./orders";
-export { categoriesService, CategoriesService } from "./categories";
 export { paymentService, PaymentService } from "./payment";
 
-// Export address service
-export { addressService, AddressService } from "./address";
-
-// Export types
+// Export service types
 export type { CreateOrderRequest } from "./orders";
-export type { CategoriesApiResponse } from "./categories";
+export type {
+  PaymentInitiationRequest,
+  PaymentInitiationResponse,
+  PaymentVerificationRequest,
+  PaymentFailureRequest,
+  PaymentMethod,
+} from "./payment";
 
 // Re-export types from @repo/types for convenience
 export type {
@@ -35,3 +36,6 @@ export type {
   PaginatedResponse,
   ApiResponse,
 } from "@repo/types";
+
+// Export address service
+export { addressService, AddressService } from "./address";

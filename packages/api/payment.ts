@@ -1,113 +1,127 @@
-// packages/api/payment.ts - NEW FILE following existing patterns
+import { apiClient } from './client';
+import { API_ENDPOINTS } from '@repo/config';
+import type { ApiResponse } from '@repo/types';
 
-import { apiClient } from "./client";
-import { API_ENDPOINTS } from "@repo/config";
-import type { ApiResponse } from "@repo/types";
+export interface PaymentInitiationRequest {
+  order_id: number;
+}
 
-// Payment types
 export interface PaymentInitiationResponse {
   razorpay_order_id: string;
   amount: number;
   currency: string;
-  receipt: string;
   key_id: string;
-  notes: Record<string, any>;
-  order_details: {
-    id: number;
-    order_number: string;
-    total_amount: number;
-  };
+  receipt: string;
+  notes: any;
+  order_details: any;
 }
 
 export interface PaymentVerificationRequest {
-  order_id: number;
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
+  order_id: number;
+}
+
+export interface PaymentFailureRequest {
+  order_id: number;
+  reason: string;
+  code: string;
+  source: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  description: string;
+  logo: string;
+  enabled: boolean;
+  key_id?: string;
+  types: string[];
 }
 
 export class PaymentService {
   async initiatePayment(orderId: number): Promise<PaymentInitiationResponse> {
     try {
-      console.log("Initiating payment for order:", orderId);
-      const response = await apiClient.post<
-        ApiResponse<PaymentInitiationResponse>
-      >(API_ENDPOINTS.PAYMENT_INITIATE, { order_id: orderId });
-
+      console.log('Initiating payment for order:', orderId);
+      const response = await apiClient.post<ApiResponse<PaymentInitiationResponse>>('/payment/initiate', {
+        order_id: orderId
+      });
+      
+      console.log('Payment initiation response:', response);
+      
       if (response.data) {
         return response.data;
       }
-
-      throw new Error("Invalid payment initiation response");
-    } catch (error) {
-      console.error("Failed to initiate payment:", error);
-      throw error;
+      
+      throw new Error('Invalid payment initiation response');
+    } catch (error: any) {
+      console.error('Failed to initiate payment:', error);
+      throw new Error(error.response?.data?.error || error.message || 'Failed to initiate payment');
     }
   }
 
-  async verifyPayment(
-    verificationData: PaymentVerificationRequest
-  ): Promise<{ message: string }> {
+  async verifyPayment(verificationData: PaymentVerificationRequest): Promise<any> {
     try {
-      console.log("Verifying payment:", verificationData);
-      const response = await apiClient.post<ApiResponse<{ message: string }>>(
-        API_ENDPOINTS.PAYMENT_VERIFY,
-        verificationData
-      );
-
+      console.log('Verifying payment:', verificationData);
+      const response = await apiClient.post<ApiResponse<any>>('/payment/verify', verificationData);
+      
+      console.log('Payment verification response:', response);
+      
       if (response.data || response.message) {
-        return { message: response.message || "Payment verified successfully" };
+        return response.data || response;
       }
-
-      throw new Error("Invalid payment verification response");
-    } catch (error) {
-      console.error("Failed to verify payment:", error);
-      throw error;
+      
+      throw new Error('Invalid payment verification response');
+    } catch (error: any) {
+      console.error('Failed to verify payment:', error);
+      throw new Error(error.response?.data?.error || error.message || 'Failed to verify payment');
     }
   }
 
-  async handlePaymentFailure(
-    orderId: number,
-    reason?: string,
-    code?: string
-  ): Promise<{ message: string }> {
+  async reportPaymentFailure(failureData: PaymentFailureRequest): Promise<any> {
     try {
-      const response = await apiClient.post<ApiResponse<{ message: string }>>(
-        API_ENDPOINTS.PAYMENT_FAILURE,
-        {
-          order_id: orderId,
-          reason: reason || "Payment failed",
-          code: code || "UNKNOWN",
-        }
-      );
-
+      console.log('Reporting payment failure:', failureData);
+      const response = await apiClient.post<ApiResponse<any>>('/payment/failure', failureData);
+      
       if (response.data || response.message) {
-        return { message: response.message || "Payment failure recorded" };
+        return response.data || response;
       }
-
-      throw new Error("Invalid payment failure response");
-    } catch (error) {
-      console.error("Failed to handle payment failure:", error);
-      throw error;
+      
+      throw new Error('Invalid payment failure response');
+    } catch (error: any) {
+      console.error('Failed to report payment failure:', error);
+      throw new Error(error.response?.data?.error || error.message || 'Failed to report payment failure');
     }
   }
 
-  async getPaymentStatus(
-    orderId: number
-  ): Promise<{ status: string; payment_method?: string }> {
+  async getPaymentStatus(orderId: number): Promise<any> {
     try {
-      const response = await apiClient.get<
-        ApiResponse<{ status: string; payment_method?: string }>
-      >(`${API_ENDPOINTS.PAYMENT_STATUS}/${orderId}`);
-
+      const response = await apiClient.get<ApiResponse<any>>(`/payment/status/${orderId}`);
+      
       if (response.data) {
         return response.data;
       }
+      
+      throw new Error('Invalid payment status response');
+    } catch (error: any) {
+      console.error('Failed to get payment status:', error);
+      throw new Error(error.response?.data?.error || error.message || 'Failed to get payment status');
+    }
+  }
 
-      throw new Error("Invalid payment status response");
-    } catch (error) {
-      console.error("Failed to get payment status:", error);
-      throw error;
+  async getPaymentMethods(): Promise<PaymentMethod[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<PaymentMethod[]>>('/payment/methods');
+      
+      if (response.data) {
+        return response.data;
+      }
+      
+      throw new Error('Invalid payment methods response');
+    } catch (error: any) {
+      console.error('Failed to get payment methods:', error);
+      throw new Error(error.response?.data?.error || error.message || 'Failed to get payment methods');
     }
   }
 }

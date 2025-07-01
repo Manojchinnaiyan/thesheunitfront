@@ -176,3 +176,91 @@ export interface OrderCreateRequest {
  notes?: string;
  use_shipping_as_billing?: boolean;
 }
+
+// Extended Order Types for detailed view
+export interface OrderDetails {
+  id: number;
+  user_id: number;
+  order_number: string;
+  email: string;
+  status: OrderStatus;
+  payment_status: PaymentStatus;
+  total_amount: number;
+  shipping_cost: number;
+  tax_amount: number;
+  discount_amount: number;
+  currency: string;
+  shipping_method: string;
+  payment_method: string;
+  tracking_number?: string;
+  shipping_carrier?: string;
+  notes?: string;
+  items: OrderItemDetails[];
+  shipping_address: Address;
+  billing_address: Address;
+  status_history?: OrderStatusHistory[];
+  payments?: PaymentRecord[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderItemDetails {
+  id: number;
+  order_id: number;
+  product_id: number;
+  product_variant_id?: number;
+  sku: string;
+  name: string;
+  variant_title?: string;
+  quantity: number;
+  price: number;
+  total_price: number;
+}
+
+export interface OrderStatusHistory {
+  id: number;
+  order_id: number;
+  status: OrderStatus;
+  comment: string;
+  created_by: number;
+  created_at: string;
+}
+
+export interface PaymentRecord {
+  id: number;
+  order_id: number;
+  payment_method: string;
+  payment_provider_id?: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  gateway: string;
+  gateway_response?: string;
+  processed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+
+// Order tracking types
+export interface OrderTrackingInfo {
+  order_number: string;
+  status: OrderStatus;
+  payment_status: PaymentStatus;
+  tracking_number?: string;
+  shipping_carrier?: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  estimated_delivery?: string;
+  status_history: OrderStatusHistory[];
+}
+
+// Order list response types
+export interface OrderListResponse {
+  orders: Order[];
+  pagination: Pagination;
+  total: number;
+  limit: number;
+  page: number;
+}

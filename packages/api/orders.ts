@@ -54,9 +54,11 @@ export class OrdersService {
     }
   }
 
-  async cancelOrder(id: number): Promise<Order> {
+  async cancelOrder(id: number, reason?: string): Promise<Order> {
     try {
-      const response = await apiClient.put<ApiResponse<Order>>(`${API_ENDPOINTS.ORDERS}/${id}/cancel`);
+      const response = await apiClient.put<ApiResponse<Order>>(`${API_ENDPOINTS.ORDERS}/${id}/cancel`, {
+        reason: reason || 'Cancelled by customer'
+      });
       
       if (response.data) {
         return response.data;
@@ -65,6 +67,21 @@ export class OrdersService {
       throw new Error('Invalid cancel order response');
     } catch (error) {
       console.error('Failed to cancel order:', error);
+      throw error;
+    }
+  }
+
+  async trackOrder(id: number): Promise<any> {
+    try {
+      const response = await apiClient.get<ApiResponse<any>>(`${API_ENDPOINTS.ORDERS}/${id}/track`);
+      
+      if (response.data) {
+        return response.data;
+      }
+      
+      throw new Error('Invalid track order response');
+    } catch (error) {
+      console.error('Failed to track order:', error);
       throw error;
     }
   }
